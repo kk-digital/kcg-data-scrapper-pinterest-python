@@ -17,7 +17,6 @@ file_out_path = 'output_of_second_tool.json'
 Separator_for_csv = "\t"
 DATABASE_PATH = "database.db"
 HOW_MANY_WINDOWS_DO_YOU_NEED = 1
-LINK_CHROMEDRIVER = r"D:\ChromeDriver\chrome_ver101\chromedriver.exe"
 
 def initDriver():
     options = chrome_options()
