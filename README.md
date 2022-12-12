@@ -26,7 +26,7 @@ To start using PinterestScraper tool, you need to have a working version of `Goo
 
 Afterwards run the following command to install the required dependencies for the tool. 
 ```
-pip install -r src/to/dir/requirements.txt
+pip install -r ./requirements.txt
 ```
 ## CLI Parameters
 
@@ -41,13 +41,13 @@ pip install -r src/to/dir/requirements.txt
 
 * This command will execute all the 4 stages searching for `bears` images
 ```shell
-python src/to/dir/PinterestScraper.py --search_term='bears'
+python ./PinterestScraper.py --search_term='bears'
 ```
 
 
 * This command will execute only the 3rd & 4th stages and will use the stored url links stored in the sqlite database
 ```shell
-python src/to/dir/PinterestScraper.py --stages_to_execute=[3,4]
+python ./PinterestScraper.py --stages_to_execute=[3,4]
 ```
 
 
