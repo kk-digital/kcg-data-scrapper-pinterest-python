@@ -33,7 +33,7 @@ python ./PinterestScraper.py --search_term='bears'
 python ./PinterestScraper.py --stages_to_execute=[3,4]
 ```
 
-## CLI Parameters
+## CLI Arguments and Options
 
 * `search_term` _[string]_ - _[optional]_ - If stage 1 was chosen to be executed then it should be a valid string to search boards with that provided string or else the tool will raise error. 
 
