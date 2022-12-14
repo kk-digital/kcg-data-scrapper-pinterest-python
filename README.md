@@ -16,7 +16,7 @@ Before going to `stage 4` this stage is just simply excludes any duplicated pin 
 Given the pin urls stored from `stage 2` and after the duplicated urls being excluded in `stage 3` this last stage is going through those pin links and downloading the images inside those pins, then compresses those downloaded images and uploading them to `Mega Upload`. 
 
 ## Requirements
-Afterwards run the following command to install the required dependencies for the tool. 
+This tool uses Chrome web driver ,afterwards run the following command to install the required dependencies for the tool. 
 ```sh
 pip install -r ./requirements.txt
 ```
