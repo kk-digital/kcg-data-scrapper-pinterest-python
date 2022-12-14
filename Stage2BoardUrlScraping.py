@@ -10,10 +10,14 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 import time
 import re
+import os 
 
 
+# creating output folder.
+out_folder = 'outputs'
+os.makedirs(out_folder, exist_ok=True)
 
-file_out_path = 'output_of_second_tool.json'
+file_out_path = os.path.join(out_folder, 'output_of_second_tool.json')
 Separator_for_csv = "\t"
 DATABASE_PATH = "database.db"
 HOW_MANY_WINDOWS_DO_YOU_NEED = 1
@@ -84,8 +88,6 @@ class window:
 
         if not first_roll:
             self.driver.execute_script("window.scrollBy(0, window.innerHeight);")
-            #time.sleep(3)
-
         return True
 
     def get_link_pin(self):

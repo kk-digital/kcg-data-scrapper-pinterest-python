@@ -18,13 +18,16 @@ from selenium.webdriver.support import expected_conditions as EC
 from os.path import isfile, join
 from zipfile import ZipFile
 
+out_folder = 'outputs'
+os.makedirs(out_folder, exist_ok=True)
+
+FOLDER_PATH = os.path.join(out_folder, 'images')
+RAR_PATH = os.path.join(out_folder, 'rar_files')
+
 maximum_scrape_theads = 2
 maximum_download_theads = 40
 DATABASE_PATH = 'database.db'
-RAR_PATH = os.getcwd()+"/"
-FOLDER_PATH = os.getcwd()+"/IMAGE/"
 MEGA_FOLDER_LINK = ""
-
 
 class database:
     @staticmethod
@@ -281,7 +284,7 @@ class rar:
                 self.copy_to(file_origin, sub_folder)
 
             number_of_rar += 1
-        all_folders = [folder for folder in os.listdir('./') if isdir(folder)]
+        all_folders = [folder for folder in os.listdir(RAR_PATH)]
         for folder in  all_folders: 
             if re.match("RAR\d+$", folder): 
                 folder = re.fullmatch("RAR\d+$", folder).group(0)
@@ -311,7 +314,7 @@ class rar:
             zip_file_name += '.zip'
             
         # create a ZipFile object
-        with ZipFile(zip_file_name, 'w') as zipObj:
+        with ZipFile(os.path.join(RAR_PATH,zip_file_name), 'w') as zipObj:
             # Iterate over all the files in directory
             for folderName, subfolders, filenames in os.walk(sub_folder):
                 for filename in filenames:
@@ -442,6 +445,5 @@ class Stage4:
         
 if __name__ == '__main__':
 
-    stage4 = Stage4() 
-    
+    stage4 = Stage4()     
     stage4.run()

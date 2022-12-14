@@ -1,9 +1,12 @@
 import sqlite3
 import sys
+import os
 
-file_out_path = 'output_of_third_tool.csv'
+# creating output folder.
+out_folder = 'outputs'
+os.makedirs(out_folder, exist_ok=True)
 
-
+file_out_path = os.path.join(out_folder, 'output_of_third_tool.csv')
 DATABASE_PATH = "database.db"
 
 def get_all_pins_url():

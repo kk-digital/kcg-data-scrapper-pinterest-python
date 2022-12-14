@@ -9,20 +9,19 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
+# creating the output folder 
+out_folder = 'outputs'
+os.makedirs(out_folder, exist_ok=True)
 
-
-file_out_path = 'output_of_first_tool.csv'
-
+file_out_path = os.path.join(out_folder, 'output_of_first_tool.csv')
 Separator_for_csv = "\t"
-
 DATABASE_PATH = 'database.db'
-
 TIME_TIME_WAIT_UNTIL_THE_WEB_LOADED = 0.5
-
 all_data = {}
 
 
-def initDriver(IS_HEADLESS=False):
+def initDriver():
+    """ Creating driver object """
     options = chrome_options()
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
@@ -201,18 +200,7 @@ class Stage1:
         else:
             exit()
         driver = initDriver()
-        # try:
-        #     for i in range(len(sys.argv)):
-        #         if(sys.argv[i] == '-o'):
-        #             file_out_path = sys.argv[i+1]
-        #             break
-        # except:
-        #     print("file_out_path is not set yet!")
-        # input
         search_term = search_term
-        # search_term = "pixel art"
-
-        # process
         first_tool(driver, search_term)
         driver.quit()
         
