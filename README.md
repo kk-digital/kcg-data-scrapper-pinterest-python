@@ -5,11 +5,14 @@ This tool can be used to make image scrapping on Pinterest, the tool have 4 stag
 
 <h4>Stage 1 - Board Search</h4>
 Given a `search term` the crawler searches for boards using this term and stores the collected board links into a `sqlite` database to be used for collecting the pin urls in the second stage. 
-### Stage 2 - Board Url Scraping
+
+<h4>Stage 2 - Board Url Scraping</h4>
 Given the board urls stored in the database from `stage 1` the crawler go through those stored links and collects the pins links and stores them in the `sqlite` database to be used in scraping and downloading the pins images in `stage 4`. 
-### Stage 3 - Get Unique Pins
+
+<h4>Stage 3 - Get Unique Pins </h4>
 Before going to `stage 4` this stage is just simply excludes any duplicated pin urls so that in the fourth and the last stage, only the unique pins are being downloaded. 
-### Stage 4 - Download Images
+
+<h4>Stage 4 - Download Images</h4>
 Given the pin urls stored from `stage 2` and after the duplicated urls being excluded in `stage 3` this last stage is going through those pin links and downloading the images inside those pins, then compresses those downloaded images and uploading them to `Mega Upload`. 
 
 
