@@ -88,6 +88,7 @@ class window:
 
         if not first_roll:
             self.driver.execute_script("window.scrollBy(0, window.innerHeight);")
+            time.sleep(1)
         return True
 
     def get_link_pin(self):
