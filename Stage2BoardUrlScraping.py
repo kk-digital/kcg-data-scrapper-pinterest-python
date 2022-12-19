@@ -96,8 +96,8 @@ class window:
         get_url = self.driver.current_url
         print(f"[INFO] THE CURRENT PAGE WINDOW IN IS {get_url}")
         self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
-        #mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@role='main']")
-        mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@class='gridCentered']")
+        mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@role='main']")
+        #mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@class='gridCentered']")
         mother_of_a_tag = mother_of_a_tag.get_attribute('innerHTML')
         soup = BeautifulSoup(mother_of_a_tag, 'html.parser')
         for i in soup.find_all('a'):
