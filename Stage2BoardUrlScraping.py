@@ -40,6 +40,34 @@ def initDriver():
         ChromeDriverManager().install()), options=options)
 
 
+
+def page_has_loaded(driver, sleep_time = 1):
+    '''
+    Waits for page to completely load by comparing current page hash values.
+    '''
+
+    def get_page_hash(driver):
+        '''
+        Returns html dom hash
+        '''
+        # can find element by either 'html' tag or by the html 'root' id
+        dom = driver.find_element(By.TAG_NAME,'html').get_attribute('innerHTML')
+        # dom = driver.find_element_by_id('root').get_attribute('innerHTML')
+        dom_hash = hash(dom.encode('utf-8'))
+        return dom_hash
+
+    page_hash = 'empty'
+    page_hash_new = ''
+    
+    # comparing old and new page DOM hash together to verify the page is fully loaded
+    while page_hash != page_hash_new: 
+        page_hash = get_page_hash(driver)
+        time.sleep(sleep_time)
+        page_hash_new = get_page_hash(driver)
+        print('<page_has_loaded> - page not loaded')
+
+    print('<page_has_loaded> - page not loaded')
+
 class window:
     all_links = {}
     count_load_failt = 0
@@ -87,8 +115,8 @@ class window:
             self.count = 0
 
         if not first_roll:
-            self.driver.execute_script("window.scrollBy(0, window.innerHeight);")
-            time.sleep(1)
+            self.driver.execute_script("window.scrollBy(0, Math.abs(window.innerHeight-5) );")
+            page_has_loaded(self.driver)
         return True
 
     def get_link_pin(self):
