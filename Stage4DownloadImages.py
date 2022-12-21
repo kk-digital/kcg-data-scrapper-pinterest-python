@@ -17,17 +17,49 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from os.path import isfile, join
 from zipfile import ZipFile
+import glob
 
+
+
+# Paths will be used in the script
 out_folder = 'outputs'
 os.makedirs(out_folder, exist_ok=True)
-
-FOLDER_PATH = os.path.join(out_folder, 'images')
-RAR_PATH = os.path.join(out_folder, 'rar_files')
-
+PARENT_FOLDER_PATH = os.path.join(out_folder, 'datasets')
+os.makedirs(PARENT_FOLDER_PATH, exist_ok=True)
+FOLDER_PATH = "" 
+RAR_PATH = os.path.join(out_folder, 'dataset-zip-files')
+os.makedirs(RAR_PATH, exist_ok=True)
 maximum_scrape_theads = 2
 maximum_download_theads = 40
 DATABASE_PATH = 'database.db'
 MEGA_FOLDER_LINK = ""
+
+
+def next_dataset_index():
+    """ Getting the index of the new dataset """
+    try:
+        indices = []
+        for dataset in os.listdir(PARENT_FOLDER_PATH):
+            try :
+                indices.append(int(dataset.split("-")[1]))
+                continue
+
+            except Exception as e:
+                print(f"[WARINING] {dataset} has a problem")            
+                try:
+                    indices.append(max(indices)+1)
+                except ValueError: # indices list is empty 
+                    indices.append(1)
+
+        return max(indices) + 1
+    
+    except ValueError:
+        return 1    
+        
+def latest_file(folder):
+    list_of_files = glob.glob(f'{folder}/*') # * means all 
+    latest_file = max(list_of_files, key=os.path.getctime)
+    return latest_file
 
 class database:
     @staticmethod
@@ -75,7 +107,9 @@ class database:
 
     @staticmethod
     def delete_pin_is_downloading():
-        cmd = "update stage2 set downloaded = 0 where downloaded = 1"
+        """ Making all the pins (not downloaded) """
+
+        cmd = "update stage2 set downloaded = 0 where downloaded != 0"
         try:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute(cmd)
@@ -84,6 +118,21 @@ class database:
             print(str(e))
             time.sleep(1)
             database.delete_pin_is_downloading()
+
+    @staticmethod
+    def delete_pin_is_downloading_imageurl():
+        """ Making all the pins (not downloaded) """
+
+        cmd = "update image_url set downloaded = 0 where downloaded != 0"
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute(cmd)
+                conn.commit()
+        except Exception as e:
+            print(str(e))
+            time.sleep(1)
+            database.delete_pin_is_downloading()
+
 
     @staticmethod
     def set_url_downloading(url):
@@ -99,6 +148,8 @@ class database:
 
     @staticmethod
     def get_pin_url():
+        """ Getting all the pin urls for images which will be downloaded (download state = 0) """
+
         cmd_get_url_list = "select pin_url from stage2 where downloaded = 0;"
         # cmd_get_url_list = "select pin_url from stage2 where downloaded = 0 LIMIT 1000;"
         try:
@@ -148,13 +199,17 @@ class database:
 
 class images:
     def download_all_images(self):
+        
+        FOLDER_PATH = os.path.join(PARENT_FOLDER_PATH , f"images-{next_dataset_index():04n}")
+        os.makedirs(FOLDER_PATH, exist_ok=True) 
+        
         all_urls = database.get_all_image_urls()
         threads = []
         count = 0
         for ur in all_urls:
             count += 1
             th = multiprocessing.Process(
-                target=self.download, args=(ur, ))
+                target=self.download, args=(ur, FOLDER_PATH))
             th.start()
             threads.append(th)
             database.set_image_downloaded(ur)
@@ -163,15 +218,13 @@ class images:
                     i.join()
                 threads = []
 
-
-    def download(self, url):
+    def download(self, url , out_folder):
         try_again = 2
-        if(not os.path.exists(FOLDER_PATH)):
-            os.mkdir(FOLDER_PATH)
+
         while(bool(try_again)):
-            file_path = FOLDER_PATH+"/" + \
-                url.replace(":", "_").replace("/", "_")
-            # print(file_path)
+            file_path = os.path.join(out_folder , url.replace(":", "_").replace("/", "_"))
+            print(f"[INFO] downloading :{file_path} ")
+            
             if(os.path.exists(file_path)):
                 print("exists: ", url)
                 return
@@ -181,7 +234,6 @@ class images:
                     with open(file_path, 'wb') as f:
                         r.raw.decode_content = True
                         shutil.copyfileobj(r.raw, f)
-
                 break
             except Exception as e:
                 print(str(e))
@@ -221,12 +273,14 @@ class pins:
                 print(str(e))
                 if(str(e).find("conn") != -1):
                     self.sub_scrape_image(pin_url)
+                    print(f"[WARNING] {pin_url} has a problem!")
                     return
-                print("Link error: ", pin_url)
+                print(f"[WARNING] {pin_url} has a problem!")
                 return
         start = page.find("https://i.pinimg.com/original")
         if(start == -1):
             print(pin_url)
+            print(f"[WARNING] {pin_url} has a problem!")
             return
 
         end = start+30
@@ -237,24 +291,6 @@ class pins:
 
 
 class rar:
-    # def add_to_rar_file(self):
-    #     ONE_GB = 1073741824
-    #     print("Creating file rar in " + FOLDER_PATH)
-    #     files = os.listdir(FOLDER_PATH)
-    #     number_of_rar = 0
-    #     while(len(files) != 0):
-    #         list_file_for_rar = []
-    #         size_of_rar = 0
-    #         while(size_of_rar < ONE_GB):
-    #             file_name = files.pop()
-    #             file_path = FOLDER_PATH+"/"+file_name
-    #             size_of_rar += os.path.getsize(file_path)
-    #             list_file_for_rar.append(file_path)
-    #         for x in list_file_for_rar:
-    #             command = "rar a "+FOLDER_PATH+str(number_of_rar)+".rar "+x
-    #             subprocess.call(command, stdout=subprocess.PIPE)
-    #         number_of_rar += 1
-
     def get_rar_path(self):
         global RAR_PATH
         l = []
@@ -265,34 +301,19 @@ class rar:
         return l
 
     def add_to_rar_file(self):
-        ONE_GB = 1073741824
-        print("Creating file rar in " + RAR_PATH)
-        files = [f for f in listdir(FOLDER_PATH)
-                 if isfile(join(FOLDER_PATH, f))]
-        number_of_rar = 0
-        while(len(files) != 0):
-            size_of_rar = 0
-            sub_folder = RAR_PATH+"/RAR"+str(number_of_rar)
-            try:
-                os.mkdir(sub_folder)
-            except:
-                pass
-            while(len(files) != 0 and size_of_rar < ONE_GB):
-                file_name = files.pop()
-                file_origin = FOLDER_PATH+"/"+file_name
-                size_of_rar += os.path.getsize(file_origin)
-                self.copy_to(file_origin, sub_folder)
 
-            number_of_rar += 1
-        all_folders = [folder for folder in os.listdir(RAR_PATH)]
-        for folder in  all_folders: 
-            if re.match("RAR\d+$", folder): 
-                folder = re.fullmatch("RAR\d+$", folder).group(0)
-                self.create_rar_file(os.path.abspath(folder), folder)
+        os.makedirs(RAR_PATH, exist_ok=True)
+        FOLDER_PATH = latest_file(PARENT_FOLDER_PATH)
+        
+        print(f"[INFO] FOLDER WILL BE ZIPPED : {FOLDER_PATH}")
+        
+        files = [f for f in listdir(FOLDER_PATH) if isfile(join(FOLDER_PATH, f))]
+        
+        print(f"[INFO] {len(files)} will be zipped ")
+        
+        self.create_rar_file(FOLDER_PATH, os.path.basename(FOLDER_PATH))
 
     def copy_to(self, from_file, to_folder):
-        # shutil.copy(from_file, to_folder)
-        # i have a low capacity
         try: 
             shutil.copy2(from_file, to_folder)
         except Exception: 
@@ -304,7 +325,7 @@ class rar:
         :type sub_folder: str
         :param zip_file_name: If it's set to True the function will return paths of all files in the given directory 
                 and all its subdirectories
-        :type zip_file_name: bool
+        :type zip_file_name: str
         :returns: 
         :rtype: None 
         '''
@@ -317,13 +338,12 @@ class rar:
         with ZipFile(os.path.join(RAR_PATH,zip_file_name), 'w') as zipObj:
             # Iterate over all the files in directory
             for folderName, subfolders, filenames in os.walk(sub_folder):
+                print(f"FILE NAMES IN RAR SUBFOLDER {filenames}")
                 for filename in filenames:
                     #create complete filepath of file in directory
                     filePath = os.path.join(folderName, filename)
                     # Add file to zip
                     zipObj.write(filePath, os.path.basename(filePath))
-
-
 
 class chrome:
     def initDriver(IS_HEADLESS=False) -> webdriver:
@@ -383,15 +403,16 @@ class chrome:
 class Stage4: 
     def __init__(self) -> None:
         pass
-    
 
-
-    def run(self, maximum_scrape_theads = 2) -> None: 
+    def run(self, maximum_scrape_theads = 2) -> None:
+        
         database.delete_pin_is_downloading()
+        database.delete_pin_is_downloading_imageurl()
         pin_urls = database.get_pin_url()
 
         if(pin_urls == None):
             print("Scraped all image link")
+
         else:
             pin = {}
             temp_pin_urls = {}
@@ -432,6 +453,7 @@ class Stage4:
                 if(temp_pin_urls[x] != None):
                     for i in temp_pin_urls[x]:
                         database.set_pin_is_downloaded(i)
+                        
         print("Downloading images...")
         i = images()
         i.download_all_images()
@@ -442,7 +464,7 @@ class Stage4:
         # c = chrome()
         # c.upload_to_mega()
  
-        
+
 if __name__ == '__main__':
 
     stage4 = Stage4()     
