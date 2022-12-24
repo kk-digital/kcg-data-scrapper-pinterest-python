@@ -10,6 +10,7 @@ class Sel:
         self.args = args
         
     def get_driver(self):
+        print("Initalizing chrome driver...")
         user_data_dir = f"{os.getcwd()}/chrome"
         options = uc.ChromeOptions()
         options.add_argument('--headless')
