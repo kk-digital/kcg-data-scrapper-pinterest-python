@@ -24,13 +24,13 @@ pip install -r ./requirements.txt
 ## Example Usages
 * This command will execute all the 4 stages searching for `bears` images
 ```shell
-python ./pinterest_scraper.py --search_term='bears'
+python ./PinterestScraper.py --search_term='bears'
 ```
 
 
 * This command will execute only the 3rd & 4th stages and will use the stored url links stored in the sqlite database
 ```shell
-python ./pinterest_scraper.py --stages_to_execute=[3,4]
+python ./PinterestScraper.py --stages_to_execute=[3,4]
 ```
 
 ## CLI Arguments and Options
