@@ -19,7 +19,8 @@ def get_all_pins_url():
             for i in cursor:
                 returns.append(i[0])
     except:
-        return get_all_pins_url()
+        #return get_all_pins_url()
+        print("[ERROR] Problem with opening the DB. ")
     return returns
 
 class Stage3: 
