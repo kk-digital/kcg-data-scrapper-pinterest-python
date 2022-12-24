@@ -7,7 +7,10 @@ from selenium.webdriver.chrome.service import Service as chrome_service
 from selenium.webdriver.chrome.options import Options as chrome_options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+
+from sel import Sel
 
 # creating the output folder 
 out_folder = 'outputs'
@@ -20,35 +23,18 @@ TIME_TIME_WAIT_UNTIL_THE_WEB_LOADED = 0.5
 all_data = {}
 
 
-def initDriver():
-    """ Creating driver object """
-    options = chrome_options()
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument("--disable-blink-features")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--remote-debugging-port=9222")
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    prefs = {
-        "profile.managed_default_content_settings.images": 2
-    }
-    options.add_experimental_option("prefs", prefs)
-    return webdriver.Chrome(service=chrome_service(
-        ChromeDriverManager().install()), options=options)
 
 
 def wait_until_load_full_images(driver, search_term):
     temp = -1
     warnning = -1
-    driver.maximize_window() # For maximizing window
+    #driver.maximize_window() # For maximizing window
     driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
     while(1):
         time.sleep(1)
         tag_div = driver.find_element(By.XPATH , "//div[@role='list']")
         get_boards(tag_div.get_attribute('innerHTML'), search_term)
-        print(len(all_data))
+        print(f"\n\n\nboard count: {len(all_data)}\n\n\n")
         if(len(all_data) == temp):
             warnning += 1
             if(warnning == 10):
@@ -148,6 +134,12 @@ def create_database():
                        PRIMARY KEY,
     downloaded INTEGER DEFAULT (0) 
     );'''
+
+    cmd4 = '''CREATE TABLE report (
+    id        INTEGER    PRIMARY KEY
+                       AUTOINCREMENT,
+    total_images INTEGER NOT NULL DEFAULT(0) 
+    );'''
     db = sqlite3.connect(DATABASE_PATH)
     c = db.cursor()
     c.execute('PRAGMA encoding="UTF-8";')
@@ -156,6 +148,8 @@ def create_database():
     c.execute(cmd2)
     db.commit()
     c.execute(cmd3)
+    db.commit()
+    c.execute(cmd4)
     db.commit()
     
 
@@ -181,8 +175,8 @@ def insert_data_into_database(arg1, arg2):
             time.sleep(1)
 
 class Stage1: 
-    def __init__(self) -> None:
-        return
+    def __init__(self,args) -> None:
+        self.args = args
     
     def run(self, search_term: str) -> None: 
         """
@@ -199,7 +193,8 @@ class Stage1:
             delete_all_data_in_database()
         else:
             exit()
-        driver = initDriver()
+        sel = Sel(self.args)
+        driver = sel.get_driver()
         search_term = search_term
         first_tool(driver, search_term)
         driver.quit()
@@ -216,7 +211,8 @@ class Stage1:
                 f.write(Separator_for_csv)
                 f.write(str(data[2]))
                 f.write("\n")
-                insert_data_into_database(search_term, str(url))   
+                insert_data_into_database(search_term, str(url))
+        print("finished stage 1")   
 
 if __name__ == '__main__':
     stage1 = Stage1() 

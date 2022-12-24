@@ -1,5 +1,5 @@
 from genericpath import isdir
-import re
+from lxml import html
 import sqlite3
 import subprocess
 import requests
@@ -18,8 +18,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from os.path import isfile, join
 from zipfile import ZipFile
 import glob
-
-
+import undetected_chromedriver as uc
+from bs4 import BeautifulSoup
+from lxml import etree
 
 # Paths will be used in the script
 out_folder = 'outputs'
@@ -33,7 +34,7 @@ maximum_scrape_theads = 2
 maximum_download_theads = 40
 DATABASE_PATH = 'database.db'
 MEGA_FOLDER_LINK = ""
-
+failed_download_links = []
 
 def next_dataset_index():
     """ Getting the index of the new dataset """
@@ -62,6 +63,20 @@ def latest_file(folder):
     return latest_file
 
 class database:
+    @staticmethod
+    def get_total_images():
+        cmd = "select total_images from report LIMIT 1;"
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute(cmd)
+                conn.commit()
+                for i in cursor:
+                    return i[0]
+        except Exception as e:
+            print(e)
+            time.sleep(1)
+            return database.get_total_images()
+
     @staticmethod
     def get_search_term():
         cmd = "select search_term from stage1 LIMIT 1;"
@@ -199,11 +214,12 @@ class database:
 
 class images:
     def download_all_images(self):
-        
+        global failed_download_links
         FOLDER_PATH = os.path.join(PARENT_FOLDER_PATH , f"images-{next_dataset_index():04n}")
         os.makedirs(FOLDER_PATH, exist_ok=True) 
         
         all_urls = database.get_all_image_urls()
+        print(f"\n\n\nall images len: {len(all_urls)}\n\n\n")
         threads = []
         count = 0
         for ur in all_urls:
@@ -220,7 +236,6 @@ class images:
 
     def download(self, url , out_folder):
         try_again = 2
-
         while(bool(try_again)):
             file_path = os.path.join(out_folder , url.replace(":", "_").replace("/", "_"))
             print(f"[INFO] downloading :{file_path} ")
@@ -234,20 +249,25 @@ class images:
                     with open(file_path, 'wb') as f:
                         r.raw.decode_content = True
                         shutil.copyfileobj(r.raw, f)
-                break
+                        break
             except Exception as e:
                 print(str(e))
                 time.sleep(1)
                 if(str(e).find("conn") != -1):
-                    self.download(url)
+                    self.download(url,out_folder)
                     return
                 try_again -= 1
+                if try_again == 0:
+                    if (url not in failed_download_links):
+                        failed_download_links.append(url)
+
 
 
 class pins:
     def __init__(self) -> None:
         self.pin_urls = None
         self.is_done = True
+        
 
     def scrape_image_url(self, urls):
         self.pin_urls = urls
@@ -263,31 +283,25 @@ class pins:
         self.is_done = True
 
     def sub_scrape_image(self, pin_url):
+        global failed_download_links
         self.is_done = False
         try:
-            page = requests.get(pin_url).text
-        except:
-            try:
-                page = requests.get(pin_url).text
-            except Exception as e:
-                print(str(e))
-                if(str(e).find("conn") != -1):
-                    self.sub_scrape_image(pin_url)
-                    print(f"[WARNING] {pin_url} has a problem!")
-                    return
-                print(f"[WARNING] {pin_url} has a problem!")
-                return
-        start = page.find("https://i.pinimg.com/original")
-        if(start == -1):
-            print(pin_url)
-            print(f"[WARNING] {pin_url} has a problem!")
+            page = requests.get(pin_url)
+        except Exception as e:
+            print(e)
             return
-
-        end = start+30
-        while(page[end] != '"'):
-            end += 1
-        image_url = page[start:end]
-        database.push_image_url_into_database(image_url)
+        soup = BeautifulSoup(page.content,'html.parser')
+        #we look for the image tag to get the src url for download
+        img_elements = soup.find_all('img')
+        img_link = ""
+        #img_elements len is zero image is not found
+        if(len(img_elements) == 0):
+            if (pin_url not in failed_download_links):
+                failed_download_links.append(pin_url)
+            return
+        else:
+            img_link = img_elements[0].get('src')
+        database.push_image_url_into_database(img_link)
 
 
 class rar:
@@ -347,20 +361,24 @@ class rar:
 
 class chrome:
     def initDriver(IS_HEADLESS=False) -> webdriver:
-        options = chrome_options()
-        options.add_experimental_option(
-            "excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument("--disable-blink-features")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.headless = IS_HEADLESS
-        prefs = {
-            "profile.managed_default_content_settings.images": 2
-        }
-        options.add_experimental_option("prefs", prefs)
-        return webdriver.Chrome(service=chrome_service(
-            ChromeDriverManager().install()), options=options)
-
+        # options = chrome_options()
+        # options.add_experimental_option(
+        #     "excludeSwitches", ["enable-automation"])
+        # options.add_experimental_option('useAutomationExtension', False)
+        # options.add_argument("--disable-blink-features")
+        # options.add_argument("--disable-blink-features=AutomationControlled")
+        # options.headless = IS_HEADLESS
+        # prefs = {
+        #     "profile.managed_default_content_settings.images": 2
+        # }
+        # options.add_experimental_option("prefs", prefs)
+        # return webdriver.Chrome(service=chrome_service(
+        #     ChromeDriverManager().install()), options=options)
+        options = uc.ChromeOptions()
+        user_data_dir = f"{os.getcwd()}/chrome"
+        #options.add_argument("--remote-debugging-port=9222")
+        #options.add_argument('--headless')
+        return uc.Chrome(options=options,user_data_dir=user_data_dir)
     def upload_to_mega(self):
         global RAR_PATH
         driver = self.initDriver()
@@ -403,9 +421,16 @@ class chrome:
 class Stage4: 
     def __init__(self) -> None:
         pass
+    
+    def display_report(self):
+        global failed_download_links
+        total_images = database.get_total_images()
+        print(f"\n\n\n Scraper found {total_images} images\n")
+        print(f"out of {total_images} images {total_images-len(failed_download_links)} downloaded")
 
     def run(self, maximum_scrape_theads = 2) -> None:
-        
+        global failed_download_links
+        print("started stage 4")
         database.delete_pin_is_downloading()
         database.delete_pin_is_downloading_imageurl()
         pin_urls = database.get_pin_url()
@@ -460,7 +485,9 @@ class Stage4:
 
         r = rar()
         r.add_to_rar_file()
-
+        print("finished stage 4")
+        print(f"Failed download links: {failed_download_links}")
+        self.display_report()
         # c = chrome()
         # c.upload_to_mega()
  

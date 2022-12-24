@@ -2,6 +2,7 @@ import sqlite3
 import sys
 import os
 
+
 # creating output folder.
 out_folder = 'outputs'
 os.makedirs(out_folder, exist_ok=True)
@@ -31,7 +32,7 @@ class Stage3:
             function to execute the third stage of Pintrest scraping, it simply excludes any duplicated pin urls so that in the fourth and 
             the last stage only the unique pins are being downloaded. 
         """
-        
+        print("started stage 3")
         links_pin = get_all_pins_url()
         # process
         pin_set = {}
@@ -45,7 +46,8 @@ class Stage3:
             for pin in pin_set:
                 f.write(str(pin))
                 f.write("\n") 
-        
+
+        print("finished stage 3")
         return 
 
 if __name__ == '__main__':
