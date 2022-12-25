@@ -1,8 +1,8 @@
 import fire 
-from Stage1BoardSearch import Stage1
-from Stage2BoardUrlScraping import Stage2 
-from Stage3GetUniquePins import Stage3 
-from Stage4DownloadImages import Stage4
+from stage1_board_search import Stage1
+from stage2_board_url_scraping import Stage2 
+from stage3_get_unique_pins import Stage3 
+from stage4_download_images import Stage4
 from typing import List
 import os 
 
@@ -29,7 +29,7 @@ def pintrest_scraper_cli(
     
     #initialize instance of each stage.
     stages = {} 
-    stages[1] = Stage1()        
+    stages[1] = Stage1(search_term)        
     stages[2] = Stage2()        
     stages[3] = Stage3()        
     stages[4] = Stage4()     
@@ -38,7 +38,7 @@ def pintrest_scraper_cli(
         if stage_no in stages_to_execute: 
             
             if stage_no == 1: 
-                stages[stage_no].run(search_term)
+                stages[stage_no].run()
             elif stage_no == 4: 
                 stages[stage_no].run(maximum_scrape_theads)
             else: 
