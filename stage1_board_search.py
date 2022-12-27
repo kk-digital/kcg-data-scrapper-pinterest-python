@@ -95,6 +95,7 @@ def insert_data_into_database(arg1, arg2):
 
 def scrap_all_board_urls(driver,search_term,args):
     print(f"Starting scraping boards for {search_term}")
+    driver.set_page_load_timeout(3000)
     driver.get(
         "https://www.pinterest.com/search/boards/?q="+search_term.replace(" ", "%20")+"&rs=filter")
     driver.execute_script("document.body.style.zoom='50%'")

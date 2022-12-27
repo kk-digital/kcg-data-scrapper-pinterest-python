@@ -79,6 +79,7 @@ class window:
         self.board_url = board_url
         sel = Sel(self.args)
         self.driver = sel.get_driver()
+        self.driver.set_page_load_timeout(3000)
         try:
             self.driver.get(self.board_url)
             self.driver.execute_script("document.body.style.zoom='50%'")
@@ -97,30 +98,34 @@ class window:
        
         
     def get_link_pin(self):
-        main_content = self.driver.find_element(By.XPATH,"/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[5]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]")
-        links = main_content.find_elements(By.TAG_NAME,"a")
-        pin_links = []
-        last_link = ""
-        self.progress_bar.bar_prefix = f"Scraping {self.board_url}"
-        self.progress_bar.update()
-        while len(pin_links) < self.pin_count:
-            for link in links:
-                href = link.get_attribute("href")
-                last_link = link
-                if href.startswith("https://www.pinterest.com/pin/"):
-                    if href not in pin_links:
-                        pin_links.append(href)
-                        self.all_links[href.replace("https://www.pinterest.com","")] = None
-            self.driver.execute_script("arguments[0].scrollIntoView(true);",last_link)
+        try:
+            main_content = self.driver.find_element(By.XPATH,"/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[5]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]")
             links = main_content.find_elements(By.TAG_NAME,"a")
-        self.push_pin_links_to_database(pin_links)
-        global total_pins
-        total_pins += len(pin_links)
-        set_board_is_scraped(self.board_url)
-        self.progress_bar.bar_prefix = f"Finished scraping {self.board_url} "
-        self.progress_bar.next()
-        self.driver.close()
-        self.driver.quit()
+            pin_links = []
+            last_link = ""
+            self.progress_bar.bar_prefix = f"Scraping {self.board_url}"
+            self.progress_bar.update()
+            while len(pin_links) < self.pin_count:
+                for link in links:
+                    href = link.get_attribute("href")
+                    last_link = link
+                    if href.startswith("https://www.pinterest.com/pin/"):
+                        if href not in pin_links:
+                            pin_links.append(href)
+                            self.all_links[href.replace("https://www.pinterest.com","")] = None
+                self.driver.execute_script("arguments[0].scrollIntoView(true);",last_link)
+                time.sleep(1)
+                links = main_content.find_elements(By.TAG_NAME,"a")
+            self.push_pin_links_to_database(pin_links)
+            global total_pins
+            total_pins += len(pin_links)
+            set_board_is_scraped(self.board_url)
+            self.progress_bar.bar_prefix = f"Finished scraping {self.board_url} "
+            self.progress_bar.next()
+            self.driver.close()
+            self.driver.quit()
+        except Exception as e:
+            print(e)
             
    
             

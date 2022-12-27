@@ -33,7 +33,7 @@ class Sel:
             else:
                 print("No available proxy found.")
         #options.add_argument("--remote-debugging-port=9222")
-        return uc.Chrome(options=options,user_data_dir=user_data_dir)
+        return uc.Chrome(options=options)
     
     def check_proxy_connection(self,proxy):
         try:
