@@ -16,7 +16,7 @@ import os
 import undetected_chromedriver as uc
 from concurrent.futures import ThreadPoolExecutor
 from sel import Sel
-from progress.bar import Bar
+from progress.bar import ChargingBar
 
 
 # creating output folder.
@@ -246,8 +246,7 @@ class Stage2:
         """
         
         board_urls = get_board_urls()
-        progress_bar = Bar('',max=len(board_urls))
-        progress_bar.bar_suffix = ' Boards '
+        progress_bar = ChargingBar('',max=len(board_urls),suffix='%(percent)d%% - %(index)d/%(max)d')
         process(board_urls,progress_bar,self.args)
         output_json_file()
         print("Finished stage 2")

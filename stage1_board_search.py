@@ -108,7 +108,7 @@ def scrap_all_board_urls(driver,search_term,args):
             if(board_url not in all_data.keys()):
                 board_info = get_board_data(board_link_element)
                 all_data[board_url] = [search_term, board_info["image_count"], board_info["board_name"]]
-                print(f"Board {board_info['board_name']} has {board_info['image_count']} pins, link: {board_url}")
+                print(f"Board {board_info['board_name']} has {board_info['image_count']} pins, \n link: {board_url}")
             else:
                 similar_board_urls += 1
             if similar_board_urls >= len(board_link_elements) or len(all_data.keys()) == args["board_limit"]:

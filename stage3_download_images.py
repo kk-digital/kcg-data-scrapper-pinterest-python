@@ -22,7 +22,7 @@ import glob
 import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
 from lxml import etree
-from progress.bar import Bar
+from progress.bar import ChargingBar
 
 # Paths will be used in the script
 out_folder = 'outputs'
@@ -445,17 +445,17 @@ class Stage3:
 
         else:
             print(f"Scraping pins for image source link...")
-            progress_bar = Bar("",max=len(pin_urls))
+            pin_progress_bar = ChargingBar("",max=len(pin_urls),suffix='%(percent)d%% - %(index)d/%(max)d')
             pin = pins()
             with ThreadPoolExecutor(max_workers=maximum_scrape_theads) as executor:
                 for i in range(0,len(pin_urls),20):
-                    executor.submit(pin.scrape_image_url,pin_urls[i:i+20],progress_bar)
+                    executor.submit(pin.scrape_image_url,pin_urls[i:i+20],pin_progress_bar)
                         
         print("\n")
         folder_path = os.path.join(PARENT_FOLDER_PATH , f"images-{next_dataset_index():04n}")
         image = images()
         download_urls = database.get_all_image_urls()
-        download_progress_bar = Bar("Downloading images",max=len(download_urls))
+        download_progress_bar = ChargingBar("Downloading images",max=len(download_urls),suffix='%(percent)d%% - %(index)d/%(max)d')
         with ThreadPoolExecutor(max_workers=maximum_scrape_theads) as executor:
                 for i in range(0,len(download_urls),20):
                     executor.submit(image.download_images,download_urls[i:i+20],download_progress_bar,folder_path)
