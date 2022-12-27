@@ -10,11 +10,12 @@ class Sel:
         self.args = args
         
     def get_driver(self):
-        print("Initalizing chrome driver...")
         user_data_dir = f"{os.getcwd()}/chrome"
         options = uc.ChromeOptions()
         options.add_argument('--headless')
-        options.add_argument('start-maximized')
+        options.add_argument("--window-size=1000,700")
+        prefs = {"profile.managed_default_content_settings.images":2}
+        options.add_experimental_option("prefs",prefs)
         if self.args["use_proxy"] == True:
             proxies = {}
             with open('proxies.json') as f:

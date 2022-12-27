@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from genericpath import isdir
 from lxml import html
 import sqlite3
@@ -21,6 +22,7 @@ import glob
 import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
 from lxml import etree
+from progress.bar import Bar
 
 # Paths will be used in the script
 out_folder = 'outputs'
@@ -34,7 +36,8 @@ maximum_scrape_theads = 2
 maximum_download_theads = 40
 DATABASE_PATH = 'database.db'
 MEGA_FOLDER_LINK = ""
-failed_download_links = []
+similar_pin_urls = []
+
 
 def next_dataset_index():
     """ Getting the index of the new dataset """
@@ -99,6 +102,7 @@ class database:
                 conn.commit()
         except Exception as e:
             if(str(e).lower().find("unique") != -1):
+                similar_pin_urls.append(image_url)
                 pass
             elif(str(e).lower().find("database is locked") != -1):
                 time.sleep(1)
@@ -210,36 +214,45 @@ class database:
             print(str(e))
             time.sleep(1)
             database.set_image_downloaded(ur)
+    
+    @staticmethod
+    def save_failed_pin_link(failed_pin_link):
+            try:
+                with sqlite3.connect(DATABASE_PATH) as conn:
+                  conn.execute("INSERT INTO failed_pin_links VALUES (:pin_link, :error)",failed_pin_link)
+            except Exception as e:
+                print(e)
+                time.sleep(1)
+                database.save_failed_pin_link(failed_pin_link)      
 
+    @staticmethod
+    def get_failed_pin_links():
+        cmd = "select pin_url,error from failed_pin_links"
+        returns = []
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute(cmd)
+                conn.commit()
+                for i in cursor:
+                    returns.append(i[0])
+                return returns
+        except Exception as e:
+            print(str(e))
+            time.sleep(1)
+            database.get_all_image_urls() 
 
 class images:
-    def download_all_images(self):
-        global failed_download_links
-        FOLDER_PATH = os.path.join(PARENT_FOLDER_PATH , f"images-{next_dataset_index():04n}")
-        os.makedirs(FOLDER_PATH, exist_ok=True) 
-        
-        all_urls = database.get_all_image_urls()
-        print(f"\n\n\nall images len: {len(all_urls)}\n\n\n")
-        threads = []
-        count = 0
-        for ur in all_urls:
-            count += 1
-            th = multiprocessing.Process(
-                target=self.download, args=(ur, FOLDER_PATH))
-            th.start()
-            threads.append(th)
-            database.set_image_downloaded(ur)
-            if(count % maximum_download_theads == 0):
-                for i in threads:
-                    i.join()
-                threads = []
-
+    def download_images(self,download_urls,progress_bar,folder_path):
+        self.progress_bar = progress_bar
+        os.makedirs(folder_path, exist_ok=True) 
+        for ur in download_urls:
+            self.download(ur, folder_path)
+            
+            
     def download(self, url , out_folder):
         try_again = 2
         while(bool(try_again)):
-            file_path = os.path.join(out_folder , url.replace(":", "_").replace("/", "_"))
-            print(f"[INFO] downloading :{file_path} ")
-            
+            file_path = os.path.join(out_folder , url.replace(":", "_").replace("/", "_"))         
             if(os.path.exists(file_path)):
                 print("exists: ", url)
                 return
@@ -249,59 +262,55 @@ class images:
                     with open(file_path, 'wb') as f:
                         r.raw.decode_content = True
                         shutil.copyfileobj(r.raw, f)
+                        self.progress_bar.next()
+                        database.set_image_downloaded(url)
                         break
             except Exception as e:
-                print(str(e))
                 time.sleep(1)
                 if(str(e).find("conn") != -1):
                     self.download(url,out_folder)
                     return
                 try_again -= 1
                 if try_again == 0:
-                    if (url not in failed_download_links):
-                        failed_download_links.append(url)
+                    database.save_failed_pin_link(url)
+                
 
 
 
 class pins:
     def __init__(self) -> None:
         self.pin_urls = None
-        self.is_done = True
+        self.progress_bar = None
+
+    def scrape_image_url(self, urls,progress_bar):
+        self.pin_urls = urls
+        self.progress_bar = progress_bar
+        for pin_url in self.pin_urls:
+           self.sub_scrape_image(pin_url)
         
 
-    def scrape_image_url(self, urls):
-        self.pin_urls = urls
-        self.is_done = False
-        threads = []
-        for pin_url in self.pin_urls:
-            th = multiprocessing.Process(
-                target=self.sub_scrape_image, args=(pin_url, ))
-            th.start()
-            threads.append(th)
-        for t in threads:
-            t.join()
-        self.is_done = True
-
     def sub_scrape_image(self, pin_url):
-        global failed_download_links
-        self.is_done = False
+        self.progress_bar.bar_prefix = pin_url
+        retries = 1
         try:
             page = requests.get(pin_url)
         except Exception as e:
-            print(e)
+            database.save_failed_pin_link({"pin_link":pin_url,"error":str(e)})
             return
         soup = BeautifulSoup(page.content,'html.parser')
         #we look for the image tag to get the src url for download
         img_elements = soup.find_all('img')
-        img_link = ""
         #img_elements len is zero image is not found
-        if(len(img_elements) == 0):
-            if (pin_url not in failed_download_links):
-                failed_download_links.append(pin_url)
-            return
-        else:
+        if len(img_elements) != 0:
             img_link = img_elements[0].get('src')
-        database.push_image_url_into_database(img_link)
+            database.push_image_url_into_database(img_link)
+            self.progress_bar.next()
+        else:
+            if retries != 0:
+                self.sub_scrape_image(pin_url)
+                retries -= 1
+            else:
+                database.save_failed_pin_link({"pin_link":pin_url,"error":"No Image found"})
 
 
 class rar:
@@ -352,7 +361,7 @@ class rar:
         with ZipFile(os.path.join(RAR_PATH,zip_file_name), 'w') as zipObj:
             # Iterate over all the files in directory
             for folderName, subfolders, filenames in os.walk(sub_folder):
-                print(f"FILE NAMES IN RAR SUBFOLDER {filenames}")
+                #print(f"FILE NAMES IN RAR SUBFOLDER {filenames}")
                 for filename in filenames:
                     #create complete filepath of file in directory
                     filePath = os.path.join(folderName, filename)
@@ -361,23 +370,8 @@ class rar:
 
 class chrome:
     def initDriver(IS_HEADLESS=False) -> webdriver:
-        # options = chrome_options()
-        # options.add_experimental_option(
-        #     "excludeSwitches", ["enable-automation"])
-        # options.add_experimental_option('useAutomationExtension', False)
-        # options.add_argument("--disable-blink-features")
-        # options.add_argument("--disable-blink-features=AutomationControlled")
-        # options.headless = IS_HEADLESS
-        # prefs = {
-        #     "profile.managed_default_content_settings.images": 2
-        # }
-        # options.add_experimental_option("prefs", prefs)
-        # return webdriver.Chrome(service=chrome_service(
-        #     ChromeDriverManager().install()), options=options)
         options = uc.ChromeOptions()
         user_data_dir = f"{os.getcwd()}/chrome"
-        #options.add_argument("--remote-debugging-port=9222")
-        #options.add_argument('--headless')
         return uc.Chrome(options=options,user_data_dir=user_data_dir)
     def upload_to_mega(self):
         global RAR_PATH
@@ -418,19 +412,30 @@ class chrome:
         driver.quit()
 
 
-class Stage4: 
+class Stage3: 
     def __init__(self) -> None:
         pass
     
     def display_report(self):
-        global failed_download_links
         total_images = database.get_total_images()
-        print(f"\n\n\n Scraper found {total_images} images\n")
-        print(f"out of {total_images} images {total_images-len(failed_download_links)} downloaded")
+        failed_links = database.get_failed_pin_links()
+        print(f"Scraper found {total_images} images")
+        print(f"{len(similar_pin_urls)} similar images found")
+        print(f"Out of {total_images} images {total_images-len(failed_links)-len(similar_pin_urls)} downloaded")
+        print("Display more info on errors? (y/n)")
+        res = input()
+        if res == 'y':
+            print("Similar Images Link: ")
+            print(similar_pin_urls)
+            if len(failed_links) == 0:
+                print("No errors.")
+            else:
+                print("Failed links: ")
+                print(failed_links)
 
-    def run(self, maximum_scrape_theads = 2) -> None:
+    def run(self, maximum_scrape_theads = 4) -> None:
         global failed_download_links
-        print("started stage 4")
+        print("\nStarted stage 3")
         database.delete_pin_is_downloading()
         database.delete_pin_is_downloading_imageurl()
         pin_urls = database.get_pin_url()
@@ -439,54 +444,26 @@ class Stage4:
             print("Scraped all image link")
 
         else:
-            pin = {}
-            temp_pin_urls = {}
-            for x in range(maximum_scrape_theads):
-                pin[x] = pins()
-                temp_pin_urls[x] = None
-            count = 0
-            threads = []
-            while(len(pin_urls) != 0):
-                for x in range(maximum_scrape_theads):
-                    time.sleep(1)
-
-                    if(temp_pin_urls[x] != None):
-                        for i in temp_pin_urls[x]:
-                            database.set_pin_is_downloaded(i)
-                        temp_pin_urls[x] = None
-
-                    temp = []
-                    for c in range(200):
-                        try:
-                            temp.append(pin_urls.pop())
-                            print(count)
-                            count += 1
-                        except:
-                            break
-                    # pin[x].set_is_done(False)
-                    th = multiprocessing.Process(
-                        target=pin[x].scrape_image_url, args=(temp, ))
-                    th.start()
-                    temp_pin_urls[x] = temp
-                    threads.append(th)
-                for a in threads:
-                    a.join()
-
-            for x in range(maximum_scrape_theads):
-                time.sleep(1)
-
-                if(temp_pin_urls[x] != None):
-                    for i in temp_pin_urls[x]:
-                        database.set_pin_is_downloaded(i)
+            print(f"Scraping pins for image source link...")
+            progress_bar = Bar("",max=len(pin_urls))
+            pin = pins()
+            with ThreadPoolExecutor(max_workers=maximum_scrape_theads) as executor:
+                for i in range(0,len(pin_urls),20):
+                    executor.submit(pin.scrape_image_url,pin_urls[i:i+20],progress_bar)
                         
-        print("Downloading images...")
-        i = images()
-        i.download_all_images()
+        print("\n")
+        folder_path = os.path.join(PARENT_FOLDER_PATH , f"images-{next_dataset_index():04n}")
+        image = images()
+        download_urls = database.get_all_image_urls()
+        download_progress_bar = Bar("Downloading images",max=len(download_urls))
+        with ThreadPoolExecutor(max_workers=maximum_scrape_theads) as executor:
+                for i in range(0,len(download_urls),20):
+                    executor.submit(image.download_images,download_urls[i:i+20],download_progress_bar,folder_path)
+        
 
         r = rar()
         r.add_to_rar_file()
-        print("finished stage 4")
-        print(f"Failed download links: {failed_download_links}")
+        print("Finished stage 3")
         self.display_report()
         # c = chrome()
         # c.upload_to_mega()
@@ -494,5 +471,5 @@ class Stage4:
 
 if __name__ == '__main__':
 
-    stage4 = Stage4()     
-    stage4.run()
+    stage3 = Stage3()     
+    stage3.run()

@@ -1,12 +1,10 @@
-import sys
-import fire 
+import fire
+from sel import Sel 
 from stage1_board_search import Stage1
 from stage2_board_url_scraping import Stage2 
-from stage3_get_unique_pins import Stage3 
-from stage4_download_images import Stage4
+from stage3_download_images import Stage3
 from typing import List
-import os 
-import getopt
+
 
 def pintrest_scraper_cli(
                             search_term: str = None,
@@ -14,6 +12,7 @@ def pintrest_scraper_cli(
                             max_scrape_theads: int = 2,
                             max_pin_threads: int = 2,
                             use_proxy: bool = False,
+                            board_limit: int = -1,
                             ) -> None: 
     """Executes the chosen stages of the pintrest scraping, it raises error if stage 1 was chosen to be executed and `search_term` was not 
         a valid string.
@@ -26,6 +25,9 @@ def pintrest_scraper_cli(
     :type maximum_scrape_theads: int
     :param max_pin_threads: Maximum numbers of threads to scrap pins from board, default is `2` threads
     :type max_pin_threads: int
+    :returns:
+    :param board_limit: Maximum numbers of boards to scrap incase the search result returns too many boards e.g search for cats. if -1 there's no limit
+    :type board_limit: int
     :returns: 
     :rtype: None
     """
@@ -35,26 +37,28 @@ def pintrest_scraper_cli(
     parsed_args = {}
     parsed_args["use_proxy"] = use_proxy
     parsed_args["max_pin_threads"] = max_pin_threads
-    print(f"Args: {parsed_args}")
+    parsed_args["board_limit"] = board_limit
     #initialize instance of each stage.
+    print("Initalizing chrome driver...")
     stages = {} 
     stages[1] = Stage1(parsed_args)        
     stages[2] = Stage2(parsed_args)
-    #we can get rid of stage three since their won't be duplicated links        
-    stages[3] = Stage3()        
-    stages[4] = Stage4()     
+    #we can get rid of stage three since there won't be duplicated links        
+    #stages[3] = Stage3()        
+    stages[3] = Stage3()     
     
-    for stage_no in range(1, 5): 
+    for stage_no in range(1, 4): 
         if stage_no in stages_to_execute: 
             
             if stage_no == 1: 
                 stages[stage_no].run(search_term)
-            elif stage_no == 4: 
+            elif stage_no == 3: 
                 stages[stage_no].run(max_scrape_theads)
             else: 
                 stages[stage_no].run()
             
     return 
+
 
 
 

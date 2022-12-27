@@ -16,7 +16,7 @@ import os
 import undetected_chromedriver as uc
 from concurrent.futures import ThreadPoolExecutor
 from sel import Sel
-
+from progress.bar import Bar
 
 
 # creating output folder.
@@ -66,28 +66,27 @@ class window:
     board_url= None
     ending_count = 0
     pin_count = 0
-    def __init__(self, driver):
-        self.driver = driver
+    def __init__(self,progress_bar,args):
+        self.progress_bar = progress_bar
+        self.args = args
 
     def start(self, board_url):
         self.load_board_page(board_url)
         self.get_link_pin()
 
     def load_board_page(self, board_url):
-        print("[INFO] IN LOAD BOARD PAGE")
         self.all_links = {}
         self.board_url = board_url
-        self.driver.delete_all_cookies()
+        sel = Sel(self.args)
+        self.driver = sel.get_driver()
         try:
             self.driver.get(self.board_url)
+            self.driver.execute_script("document.body.style.zoom='50%'")
             pin_count_element = self.driver.find_element(By.XPATH,"/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[3]/div[1]/div[2]/div[1]/span[1]/span[1]/div[1]/div[1]")
-            p_t = pin_count_element.text.split(" ")
-            self.pin_count = int(p_t[0])
-            print(f"\n\n\n pin-count:" + f"{self.pin_count}"+ "\n\n\n")
+            p_t = pin_count_element.text.split(" ")[0].replace(",","")
+            self.pin_count = int(p_t)
             self.count_load_failt = 0
-            print(f"[INFO] Went to {self.board_url}")
         except Exception as e:
-            print("[INFO] FAILED IN LOAD BOARD PAGE")
             print(e)
             self.count_load_failt += 1
             if(self.count_load_failt == 4):
@@ -95,21 +94,15 @@ class window:
             else:
                 self.load_board_page(board_url)
 
-        #self.driver.execute_script("document.body.style.zoom='50%'")
-        print("[INFO] JS SCRIPTS EXECUTED")
+       
         
     def get_link_pin(self):
-      
-        print("[INFO] IN GET LINK PIN")
-       
-        get_url = self.driver.current_url
-        print(f"[INFO] THE CURRENT PAGE WINDOW IN IS {get_url}")
-        
         main_content = self.driver.find_element(By.XPATH,"/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[5]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]")
-        
         links = main_content.find_elements(By.TAG_NAME,"a")
         pin_links = []
         last_link = ""
+        self.progress_bar.bar_prefix = f"Scraping {self.board_url}"
+        self.progress_bar.update()
         while len(pin_links) < self.pin_count:
             for link in links:
                 href = link.get_attribute("href")
@@ -118,27 +111,36 @@ class window:
                     if href not in pin_links:
                         pin_links.append(href)
                         self.all_links[href.replace("https://www.pinterest.com","")] = None
-                        self.push_to_database(href)
             self.driver.execute_script("arguments[0].scrollIntoView(true);",last_link)
             links = main_content.find_elements(By.TAG_NAME,"a")
+        self.push_pin_links_to_database(pin_links)
         global total_pins
         total_pins += len(pin_links)
         set_board_is_scraped(self.board_url)
+        self.progress_bar.bar_prefix = f"Finished scraping {self.board_url} "
+        self.progress_bar.next()
         self.driver.close()
         self.driver.quit()
             
    
             
-    def push_to_database(self, pin_url):
-        cmd = "insert into stage2(board_url, pin_url) values ('" + \
-            str(self.board_url)+"','"+str(pin_url)+"')"
+    def push_pin_links_to_database(self, pin_urls):
+        cmd = 'INSERT INTO stage2(board_url, pin_url) values'
         try:
             with sqlite3.connect(DATABASE_PATH) as conn:
+                for i in range(len(pin_urls)):
+                    if i != len(pin_urls) - 1:
+                        cmd += "('" + \
+                        str(self.board_url)+"','"+str(pin_urls[i])+"'),"
+                    else:
+                        cmd += "('" + \
+                        str(self.board_url)+"','"+str(pin_urls[i])+"');"
                 conn.execute(cmd)
                 conn.commit()
         except Exception as e:
-            time.sleep(1)
-            self.push_to_database(pin_url)
+                    print(e)
+                    time.sleep(1)
+                    self.push_to_database(pin_urls)
 
 def push_total_image_count():
     cmd = f"insert into report(total_images) values ({total_pins})"
@@ -151,15 +153,14 @@ def push_total_image_count():
         time.sleep(1)
         push_total_image_count()
 
-def process(board_list,args):
-    sel = Sel(args)
+def process(board_list,progress_bar,args):
     with ThreadPoolExecutor(max_workers=args["max_pin_threads"]) as executor:
         for i in range(len(board_list)):
-            board_url = f"https://www.pinterest.com{board_list[i]}"
-            win = window(driver=sel.get_driver())
+            board_url = board_list[i]
+            win = window(progress_bar,args)
             executor.submit(win.start,board_url)
     push_total_image_count()
-    print(f"\n\n\nTotal Pins: {total_pins}\n\n\n")
+    print(f"\nTotal Pins: {total_pins}")
 
 def output_json_file():
     json_data = []
@@ -184,7 +185,6 @@ def output_json_file():
     count = 0
     for board_url in data:
         count+=1
-        print("Writting ", count," -> ", board_url)
         pins = []
         for cur in cursor_temp:
             if(cur[0] == board_url):
@@ -239,18 +239,18 @@ class Stage2:
         self.args = args
     
     def run(self) -> None:
-        print("stared stage 2") 
+        print("\n\nStarted scraping boards for pin urls....") 
         """
             function that executes the second stage of Pintrest scraping, which is retrieveing the board urls which was collected 
             in stage 1 and goes in them 1 by one to collect all pens urls within those boards and storing the pin urls inside the sqlite DB. 
         """
         
         board_urls = get_board_urls()
-    
-        process(board_urls,self.args)
-
+        progress_bar = Bar('',max=len(board_urls))
+        progress_bar.bar_suffix = ' Boards '
+        process(board_urls,progress_bar,self.args)
         output_json_file()
-        print("finished stage 2")
+        print("Finished stage 2")
         return 
 
 if __name__ == '__main__':

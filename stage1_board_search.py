@@ -22,95 +22,6 @@ DATABASE_PATH = 'database.db'
 TIME_TIME_WAIT_UNTIL_THE_WEB_LOADED = 0.5
 all_data = {}
 
-
-
-
-def wait_until_load_full_images(driver, search_term):
-    temp = -1
-    warnning = -1
-    #driver.maximize_window() # For maximizing window
-    driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
-    while(1):
-        time.sleep(1)
-        tag_div = driver.find_element(By.XPATH , "//div[@role='list']")
-        get_boards(tag_div.get_attribute('innerHTML'), search_term)
-        print(f"\n\n\nboard count: {len(all_data)}\n\n\n")
-        if(len(all_data) == temp):
-            warnning += 1
-            if(warnning == 10):
-                break
-        else:
-            temp = len(all_data)
-            warnning = 0
-
-
-def find_comma(str):
-    for i in range(len(str)):
-        if(str[i] == ','):
-            try:
-                int(str[i+1])
-                return i
-            except:
-                try:
-                    int(str[i+2])
-                    return i+1
-                except:
-                    continue
-    return -1
-
-
-def get_image_count(soup_a):
-    re = ''
-    for i in soup_a.find_all("div"):
-        try:
-            if(i['style'] == '-webkit-line-clamp: 1;'):
-                re += i.text
-        except:
-            pass
-    re = re.replace('\n', '')
-    if(re[find_comma(re)+1:re.find("Pins")] == ''):
-        return re
-    return re[find_comma(re)+1:re.find("Pins")]
-
-
-def get_board_name(soup_a):
-    for i in soup_a.find_all("div"):
-        try:
-            if(i['title'] != ''):
-                return i.text
-        except:
-            pass
-
-
-def get_boards(html, search_term):
-    global all_data
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    for a in soup.find_all("a"):
-        # print(a.prettify())
-        url = a["href"]
-        print(url)
-        image_count = get_image_count(a)
-        board_name = get_board_name(a)
-        # print([url, image_count, board_name])
-        all_data[url] = [search_term, image_count, board_name]
-
-
-def first_tool(driver, search_term):
-    driver.delete_all_cookies()
-    driver.get(
-        "https://www.pinterest.com/search/boards/?q="+search_term.replace(" ", "%20")+"&rs=filter")
-
-    driver.execute_script("document.body.style.zoom='50%'")
-    driver.maximize_window()
-    driver.execute_script(
-        "javascript:setInterval(function(){window.scrollBy(0, window.innerHeight);}, Math.floor(200));")
-    print("Watting for load all images...")
-    wait_until_load_full_images(driver, search_term)
-    print("All images is loaded.")
-    return
-
-
 def delete_all_data_in_database():
     delete_database()
     create_database()
@@ -140,6 +51,12 @@ def create_database():
                        AUTOINCREMENT,
     total_images INTEGER NOT NULL DEFAULT(0) 
     );'''
+
+    cmd5 = '''CREATE TABLE failed_pin_links (
+    pin_url TEXT PRIMARY KEY NOT NULL,
+    error TEXT NOT NULL
+    );'''
+
     db = sqlite3.connect(DATABASE_PATH)
     c = db.cursor()
     c.execute('PRAGMA encoding="UTF-8";')
@@ -150,6 +67,8 @@ def create_database():
     c.execute(cmd3)
     db.commit()
     c.execute(cmd4)
+    db.commit()
+    c.execute(cmd5)
     db.commit()
     
 
@@ -174,6 +93,42 @@ def insert_data_into_database(arg1, arg2):
         if(str(e).find('lock') != -1 or str(e).find('attempt to write a readonly database') != -1):
             time.sleep(1)
 
+def scrap_all_board_urls(driver,search_term,args):
+    print(f"Starting scraping boards for {search_term}")
+    driver.get(
+        "https://www.pinterest.com/search/boards/?q="+search_term.replace(" ", "%20")+"&rs=filter")
+    driver.execute_script("document.body.style.zoom='50%'")
+    main_container_div = driver.find_element(By.XPATH,"/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[2]/div[2]/div[1]/div[1]/div[1]/div[1]")
+    similar_board_urls = 1
+    stop_scrap = False
+    while(not stop_scrap):
+        board_link_elements = main_container_div.find_elements(By.TAG_NAME,"a")
+        for board_link_element in board_link_elements:
+            board_url = board_link_element.get_attribute('href')
+            if(board_url not in all_data.keys()):
+                board_info = get_board_data(board_link_element)
+                all_data[board_url] = [search_term, board_info["image_count"], board_info["board_name"]]
+                print(f"Board {board_info['board_name']} has {board_info['image_count']} pins, link: {board_url}")
+            else:
+                similar_board_urls += 1
+            if similar_board_urls >= len(board_link_elements) or len(all_data.keys()) == args["board_limit"]:
+                stop_scrap = True
+                break
+        driver.execute_script("arguments[0].scrollIntoView(true);",board_link_elements[-1])
+        time.sleep(1)
+        similar_board_urls = 1
+
+def get_board_data(board_element):
+    returns = {"board_name":"","image_count":0}
+    divs = board_element.find_elements(By.TAG_NAME,"div")
+    for div in divs:
+        if div.get_attribute("data-test-id") == "board-card-title":
+            returns["board_name"] = div.text
+        elif div.get_attribute("style") == "-webkit-line-clamp: 1;":
+            div_text = div.text.replace("\n","")
+            returns["image_count"] = div_text.split(" ")[0].replace(",","")
+    return returns
+
 class Stage1: 
     def __init__(self,args) -> None:
         self.args = args
@@ -196,7 +151,8 @@ class Stage1:
         sel = Sel(self.args)
         driver = sel.get_driver()
         search_term = search_term
-        first_tool(driver, search_term)
+        scrap_all_board_urls(driver, search_term,self.args)
+        driver.close()
         driver.quit()
         
         # output
@@ -212,7 +168,7 @@ class Stage1:
                 f.write(str(data[2]))
                 f.write("\n")
                 insert_data_into_database(search_term, str(url))
-        print("finished stage 1")   
+        print(f"Finished stage 1, found {len(all_data.keys())} boards.")
 
 if __name__ == '__main__':
     stage1 = Stage1() 
