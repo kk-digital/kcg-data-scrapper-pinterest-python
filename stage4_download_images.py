@@ -239,7 +239,7 @@ class images:
                 print(str(e))
                 time.sleep(1)
                 if(str(e).find("conn") != -1):
-                    self.download(url)
+                    self.download(url, out_folder)
                     return
                 try_again -= 1
 
@@ -300,7 +300,7 @@ class rar:
                 l.append(RAR_PATH+"\\"+i)
         return l
 
-    def add_to_rar_file(self):
+    def add_to_zip_file(self):
 
         os.makedirs(RAR_PATH, exist_ok=True)
         FOLDER_PATH = latest_file(PARENT_FOLDER_PATH)
@@ -344,60 +344,6 @@ class rar:
                     filePath = os.path.join(folderName, filename)
                     # Add file to zip
                     zipObj.write(filePath, os.path.basename(filePath))
-
-class chrome:
-    def initDriver(IS_HEADLESS=False) -> webdriver:
-        options = chrome_options()
-        options.add_experimental_option(
-            "excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument("--disable-blink-features")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.headless = IS_HEADLESS
-        prefs = {
-            "profile.managed_default_content_settings.images": 2
-        }
-        options.add_experimental_option("prefs", prefs)
-        return webdriver.Chrome(service=chrome_service(
-            ChromeDriverManager().install()), options=options)
-
-    def upload_to_mega(self):
-        global RAR_PATH
-        driver = self.initDriver()
-        driver.get(MEGA_FOLDER_LINK)
-        try:
-            element = WebDriverWait(driver, 60).until(
-                EC.presence_of_element_located((By.NAME, "dashboard"))
-            )
-        except:
-            print('Waitting Error!!')
-        time.sleep(5)
-        number = 0
-        r = rar()
-        for file in r.get_rar_path():
-            random_name = RAR_PATH + '/' + str(database.get_search_term()) + "_" +\
-                str(number) + '.rar'
-            number += 1
-
-            os.rename(file, random_name)
-            driver.find_element(By.ID, "fileselect3").send_keys(random_name)
-
-        count = 0
-        while(1):
-            x = driver.find_elements(
-                By.CLASS_NAME, 'transfer-task-row upload sprite-fm-mono icon-up progress')
-            y = driver.find_elements(
-                By.CLASS_NAME, 'transfer-task-row upload')
-
-            if(len(x) == 0 and len(y) == 0):
-                count += 1
-            else:
-                count = 0
-            if(count == 5):
-                break
-            time.sleep(2)
-        input("ENTER WHEN DONE")
-        driver.quit()
 
 
 class Stage4: 
@@ -459,13 +405,67 @@ class Stage4:
         i.download_all_images()
 
         r = rar()
-        r.add_to_rar_file()
+        r.add_to_zip_file()
 
         # c = chrome()
         # c.upload_to_mega()
- 
 
-if __name__ == '__main__':
+class chrome:
+    def initDriver(IS_HEADLESS=False) -> webdriver:
+        options = chrome_options()
+        options.add_experimental_option(
+            "excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument("--disable-blink-features")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.headless = IS_HEADLESS
+        prefs = {
+            "profile.managed_default_content_settings.images": 2
+        }
+        options.add_experimental_option("prefs", prefs)
+        return webdriver.Chrome(service=chrome_service(
+            ChromeDriverManager().install()), options=options)
 
-    stage4 = Stage4()     
-    stage4.run()
+    # def upload_to_mega(self):
+    #     global RAR_PATH
+    #     driver = self.initDriver()
+    #     driver.get(MEGA_FOLDER_LINK)
+    #     try:
+    #         element = WebDriverWait(driver, 60).until(
+    #             EC.presence_of_element_located((By.NAME, "dashboard"))
+    #         )
+    #     except:
+    #         print('Waitting Error!!')
+    #     time.sleep(5)
+    #     number = 0
+    #     r = rar()
+    #     for file in r.get_rar_path():
+    #         random_name = RAR_PATH + '/' + str(database.get_search_term()) + "_" +\
+    #             str(number) + '.rar'
+    #         number += 1
+
+    #         os.rename(file, random_name)
+    #         driver.find_element(By.ID, "fileselect3").send_keys(random_name)
+
+    #     count = 0
+    #     while(1):
+    #         x = driver.find_elements(
+    #             By.CLASS_NAME, 'transfer-task-row upload sprite-fm-mono icon-up progress')
+    #         y = driver.find_elements(
+    #             By.CLASS_NAME, 'transfer-task-row upload')
+
+    #         if(len(x) == 0 and len(y) == 0):
+    #             count += 1
+    #         else:
+    #             count = 0
+    #         if(count == 5):
+    #             break
+    #         time.sleep(2)
+    #     input("ENTER WHEN DONE")
+    #     driver.quit()
+
+
+# if __name__ == '__main__':
+
+#     stage4 = Stage4()     
+#     stage4.run()

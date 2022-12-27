@@ -78,17 +78,18 @@ class Stage1:
         return len(links_list)
     
     def __scrape_boards_urls(self):
-        self.driver.maximize_window() # For maximizing window
-        self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
+        self.driver.set_window_size(1280, 720)
+        #self.driver.maximize_window() # For maximizing window
+        #self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
         tag_div = self.driver.find_element(By.XPATH , "//div[@role='list']")
         return self.__get_boards(tag_div.get_attribute('innerHTML'))
     
-    def __scroll_and_scrape(self):        
+    def get_board_search_result(self):        
         # make driver settings ready for scrapping.
         self.driver.delete_all_cookies()
         self.driver.get("https://www.pinterest.com/search/boards/?q="+self.search_term.replace(" ", "%20")+"&rs=filter")
         self.driver.execute_script("document.body.style.zoom='50%'")
-        self.driver.maximize_window()
+        #self.driver.maximize_window()
 
         # scrape boards url
         url_count = self.__scrape_boards_urls()
@@ -128,7 +129,7 @@ class Stage1:
             
     def run(self):
         """main function of the program"""        
-        self.__scroll_and_scrape()
+        self.get_board_search_result()
 
         for url in self.all_data:
             self.__insert_data_into_database(str(url), int(self.all_data[url][1])) 
