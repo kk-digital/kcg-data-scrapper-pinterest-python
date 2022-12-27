@@ -56,7 +56,7 @@ class window:
         self.window_name = window_handle
 
     def load_board_page(self, board_url):
-        print("[INFO] IN LOAD BOARD PAGE")
+        #print("[INFO] IN LOAD BOARD PAGE")
         self.all_links = {}
         self.driver.switch_to.window(self.window_name)
         self.board_url = board_url
@@ -64,9 +64,9 @@ class window:
         try:
             self.driver.get(self.board_url)
             self.count_load_failt = 0
-            print(f"[INFO] Went to {self.board_url}")
+            #print(f"[INFO] Went to {self.board_url}")
         except:
-            print("[INFO] FAILED IN LOAD BOARD PAGE")
+            #print("[INFO] FAILED IN LOAD BOARD PAGE")
             self.count_load_failt += 1
             if(self.count_load_failt == 4):
                 return
@@ -78,7 +78,7 @@ class window:
         
     def is_loaded_full_images(self, first_roll):
         #time.sleep(0.3)
-        print("[INFO] IN IS LOADED FULL IMAGES")
+        #print("[INFO] IN IS LOADED FULL IMAGES")
         if(self.temp_length == len(self.all_links)):
             self.count += 1
             if(self.count == 5):
@@ -95,10 +95,10 @@ class window:
         return True
 
     def get_link_pin(self):
-        print("[INFO] IN GET LINK PIN")
+        #print("[INFO] IN GET LINK PIN")
         self.driver.switch_to.window(self.window_name)
         get_url = self.driver.current_url
-        print(f"[INFO] THE CURRENT PAGE WINDOW IN IS {get_url}")
+        #print(f"[INFO] THE CURRENT PAGE WINDOW IN IS {get_url}")
         self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
         
         try: 
@@ -118,8 +118,10 @@ class window:
                 self.push_to_database("https://www.pinterest.com"+id)
             
     def push_to_database(self, pin_url):
+        
         cmd = "insert into stage2(board_url, pin_url) values ('" + \
             str(self.board_url)+"','"+str(pin_url)+"')"
+        
         try:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute(cmd)
@@ -150,44 +152,44 @@ def process(board_list):
             print(len(windows[0].all_links), " pins.")
             first_roll = False
         
-        set_board_is_scraped(board_url)
+        #set_board_is_scraped(board_url)
         print("Board line : ", index, "; url: ", board_url)
         
-def output_json_file():
-    json_data = []
-    data = {}
-    number_of_images = {}
-    cmd = "select board_url, pin_url from stage2"
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        cursor = conn.execute(cmd)
-        conn.commit()
-    cursor_temp = []
-    for i in cursor:
-        cursor_temp.append(i)
-    cmd = "select board_url, pin_url, count(pin_url) from stage2 group by board_url"
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        cursor_for_pins = conn.execute(cmd)
-        conn.commit()
-    for cur in cursor_for_pins:
-        number_of_images[cur[0]] = cur[2]
-    for cur in cursor_temp:
-        data[cur[0]] = None
+# def output_json_file():
+#     json_data = []
+#     data = {}
+#     number_of_images = {}
+#     cmd = "select board_url, pin_url from stage2"
+#     with sqlite3.connect(DATABASE_PATH) as conn:
+#         cursor = conn.execute(cmd)
+#         conn.commit()
+#     cursor_temp = []
+#     for i in cursor:
+#         cursor_temp.append(i)
+#     cmd = "select board_url, pin_url, count(pin_url) from stage2 group by board_url"
+#     with sqlite3.connect(DATABASE_PATH) as conn:
+#         cursor_for_pins = conn.execute(cmd)
+#         conn.commit()
+#     for cur in cursor_for_pins:
+#         number_of_images[cur[0]] = cur[2]
+#     for cur in cursor_temp:
+#         data[cur[0]] = None
     
-    count = 0
-    for board_url in data:
-        count+=1
-        print("Writting ", count," -> ", board_url)
-        pins = []
-        for cur in cursor_temp:
-            if(cur[0] == board_url):
-                pins.append(cur[1])
-        # print({"board url": board_url, "number of images": number_of_images[board_url], "pins": pins})
-        json_data.append({"board url": board_url, "number of images": number_of_images[board_url], "pins": pins})
-    json_data = {get_search_term():json_data}
-    json_string = json.dumps(json_data)
+#     count = 0
+#     for board_url in data:
+#         count+=1
+#         print("Writting ", count," -> ", board_url)
+#         pins = []
+#         for cur in cursor_temp:
+#             if(cur[0] == board_url):
+#                 pins.append(cur[1])
+#         # print({"board url": board_url, "number of images": number_of_images[board_url], "pins": pins})
+#         json_data.append({"board url": board_url, "number of images": number_of_images[board_url], "pins": pins})
+#     json_data = {get_search_term():json_data}
+#     json_string = json.dumps(json_data)
 
-    with open(file_out_path, 'w') as outfile:
-        outfile.write(json_string)
+#     with open(file_out_path, 'w') as outfile:
+#         outfile.write(json_string)
 
 def get_board_urls():
     returns = []
@@ -215,16 +217,16 @@ def get_search_term():
         time.sleep(1)
         return get_search_term()
 
-def set_board_is_scraped(url):
-    cmd = "update stage1 set scraped = 1 where board_url = '"+url+"';"
-    try:
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            conn.execute(cmd)
-            conn.commit()
-    except Exception as e:
-        print(str(e))
-        time.sleep(1)
-        return set_board_is_scraped(url)
+# def set_board_is_scraped(url):
+#     cmd = "update stage1 set scraped = 1 where board_url = '"+url+"';"
+#     try:
+#         with sqlite3.connect(DATABASE_PATH) as conn:
+#             conn.execute(cmd)
+#             conn.commit()
+#     except Exception as e:
+#         print(str(e))
+#         time.sleep(1)
+#         return set_board_is_scraped(url)
     
 class Stage2: 
     def __init__(self) -> None:
@@ -240,7 +242,7 @@ class Stage2:
     
         process(board_urls)
 
-        output_json_file()
+        #output_json_file()
  
         return 
 
@@ -257,5 +259,5 @@ if __name__ == '__main__':
     
     process(board_urls)
 
-    output_json_file()
+    #output_json_file()
     
