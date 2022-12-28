@@ -98,9 +98,31 @@ class window:
             if(id.find("/pin/") != -1):
                 self.all_links[id] = None
                 self.push_to_database("https://www.pinterest.com"+id)
-            
+    
+    def exist_in_db(self, pin_url):
+        """checking if a board url + pin_url is in DB or not"""
+        exist = 0
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT count(*) FROM stage2 WHERE board_url=? AND pin_url=?",(self.board_url,pin_url)).fetchone()
+                conn.commit()
+                exist = cursor[0]
+
+        except Exception as e :
+            print(f"[ERROR] cannot check board existance , because of {e}")
+            time.sleep(1)
+            return self.exist_in_db(pin_url)
+        return exist
+
     def push_to_database(self, pin_url):
-        
+        if self.exist_in_db(pin_url):
+            print(f"[INFO] {pin_url} with {self.board_url} exists.")
+            return 
+        else:
+            print(f"[INFO] inserting {pin_url} with {self.board_url}.")
+            self.insert_to_database(pin_url)
+
+    def insert_to_database(self, pin_url):
         cmd = "insert into stage2(board_url, pin_url) values ('" + \
             str(self.board_url)+"','"+str(pin_url)+"')"
         

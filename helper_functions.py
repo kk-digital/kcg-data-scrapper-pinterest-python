@@ -45,11 +45,18 @@ def create_database():
     # pin_count INTEGER DEFAULT (0)
     # );
     # '''
-    
+
+    # # stage 2 table structure 
+    # cmd2 = '''CREATE TABLE stage2 (
+    # board_url  TEXT,
+    # pin_url    TEXT    PRIMARY KEY,
+    # downloaded INTEGER DEFAULT (0) 
+    # );
+    # '''
     # stage 2 table structure 
     cmd2 = '''CREATE TABLE stage2 (
     board_url  TEXT,
-    pin_url    TEXT    PRIMARY KEY,
+    pin_url    TEXT,
     downloaded INTEGER DEFAULT (0) 
     );
     '''
