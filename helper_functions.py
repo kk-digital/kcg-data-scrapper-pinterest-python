@@ -34,10 +34,18 @@ def create_database():
     # stage 1 table structure 
     cmd1 = '''CREATE TABLE stage1 (
     search_term TEXT    NOT NULL,
-    board_url   TEXT    PRIMARY KEY,
+    board_url   TEXT    NOT NULL,
     pin_count INTEGER DEFAULT (0)
     );
     '''
+    # # stage 1 table structure 
+    # cmd1 = '''CREATE TABLE stage1 (
+    # search_term TEXT    NOT NULL,
+    # board_url   TEXT    PRIMARY KEY,
+    # pin_count INTEGER DEFAULT (0)
+    # );
+    # '''
+    
     # stage 2 table structure 
     cmd2 = '''CREATE TABLE stage2 (
     board_url  TEXT,
@@ -93,4 +101,5 @@ def page_has_loaded(driver, sleep_time = 1):
         page_hash_new = get_page_hash(driver)
         #print('<page_has_loaded> - page not loaded')
 
+        
     print("[INFO] page loaded.")

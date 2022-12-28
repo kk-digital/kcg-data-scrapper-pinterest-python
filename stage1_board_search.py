@@ -4,6 +4,7 @@ from consts import DATABASE_PATH
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from helper_functions import init_driver , create_database, page_has_loaded
+import time 
 
 
 class Stage1:
@@ -113,6 +114,38 @@ class Stage1:
             self.driver.execute_script("window.scrollBy(0, Math.abs(window.innerHeight-5) );")
             page_has_loaded(driver=self.driver)
 
+    def __check_existance(self, board_url):
+        """checking if a board url + search term is in DB or not"""
+        exist = 0
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT count(*) FROM stage1 WHERE board_url=? AND search_term=?",(board_url,self.search_term)).fetchone()
+                conn.commit()
+                exist = cursor[0]
+
+        except Exception as e :
+            print(f"[ERROR] cannot check board existance , because of {e}")
+            time.sleep(1)
+            return self.__check_existance(board_url, self.search_term)
+        return exist
+
+    def __push_into_db(self, board_url, images_count):
+        if self.__check_existance(board_url):
+            print(f"[INFO] {board_url} with {self.search_term} exists, updating it.")
+            self.__update_data_in_db(board_url, images_count)
+        else:
+            print(f"[INFO] inserting {board_url}.")
+            self.__insert_data_into_database(board_url, images_count)
+
+    def __update_data_in_db(self,board_url, images_count):
+        try:
+            self.db_conn.execute("UPDATE stage1 SET pin_count = ? WHERE board_url = ? and search_term=?;",(images_count, board_url,self.search_term.replace("'", "''")))
+            self.db_conn.commit()
+        
+        except Exception as e:
+            print(f"[INFO] ERROR {e} in board {board_url}")
+ 
+
     def __insert_data_into_database(self, board_url, images_count):
         try:
             self.db_conn.execute("""INSERT INTO stage1(search_term, board_url, pin_count) VALUES (?,?,?)""",
@@ -137,9 +170,10 @@ class Stage1:
         self.get_board_search_result()
 
         for url in self.all_data:
-            self.__insert_data_into_database(str(url), int(self.all_data[url][1])) 
+            self.__push_into_db(str(url), int(self.all_data[url][1])) 
 
         self.__exit_stage()
+
 
  
 
