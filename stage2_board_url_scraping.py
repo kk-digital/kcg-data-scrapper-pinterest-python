@@ -11,7 +11,7 @@ from selenium import webdriver
 import time
 import re
 import os 
-from helper_functions import page_has_loaded
+from helper_functions import page_has_loaded , init_driver
 
 
 # creating output folder.
@@ -22,25 +22,6 @@ file_out_path = os.path.join(out_folder, 'output_of_second_tool.json')
 Separator_for_csv = "\t"
 DATABASE_PATH = "database.db"
 HOW_MANY_WINDOWS_DO_YOU_NEED = 1
-
-def initDriver():
-    options = chrome_options()
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument("--disable-blink-features")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--remote-debugging-port=9222")
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    prefs = {
-        "profile.managed_default_content_settings.images": 2
-    }
-    options.add_experimental_option("prefs", prefs)
-    return webdriver.Chrome(service=chrome_service(
-        ChromeDriverManager().install()), options=options)
-
-
 
 
 class window:
@@ -91,6 +72,7 @@ class window:
 
         if not first_roll:
             self.driver.execute_script("window.scrollBy(0, Math.abs(window.innerHeight-5) );")
+            print("[INFO] page scrolled")
             page_has_loaded(self.driver)
         return True
 
@@ -137,23 +119,127 @@ class window:
 
 
 def process(board_list):
-    driver = initDriver()
-    driver.maximize_window()
+    driver = init_driver()
+    driver.set_window_size(1280,720)
     windows = [window(driver, i) for i in driver.window_handles]
     
     for index , board in enumerate(board_list):
         board_url = f"https://www.pinterest.com{board}"
         windows[0].load_board_page(board_url)
         windows[0].get_link_pin()
-        print(len(windows[0].all_links), " pins.")
+
         first_roll = True
         while(windows[0].is_loaded_full_images(first_roll)): # waiting for the page to scroll and then collect pins
             windows[0].get_link_pin()
-            print(len(windows[0].all_links), " pins.")
+            links_count = len(windows[0].all_links)
+            print(f"[INFO] {links_count} pins scrapped in board {board_url}")
             first_roll = False
-        
         #set_board_is_scraped(board_url)
-        print("Board line : ", index, "; url: ", board_url)
+        print(f"[INFO] FINISHED URL:{board_url}; PINS = {links_count}")
+
+def count_pins_in_board(board_url):
+    pins_count = None
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.execute("SELECT count(*) as pins_count from stage2 WHERE board_url=?",(board_url,)).fetchall()
+            conn.commit()
+            pins_count = cursor[0][0]
+
+    except Exception as e :
+        print(f"[ERROR] cannot count pins in stage2 in board {board_url}!, because of {e}")
+        time.sleep(1)
+        return count_pins_in_board(board_url)
+    return pins_count
+
+
+def board_pins_count_report(search_term):
+    boards = get_board_urls(search_term)
+    
+    for board in boards:
+        board_url = f"https://www.pinterest.com{board}"
+        scrapped_pins_count = count_pins_in_board(board_url)
+        true_pins_count     = get_true_pins_count(board)
+        print(f"[INFO] BOARD {board} , SCRAPPED {scrapped_pins_count} , TRUE {true_pins_count}")
+
+
+def get_true_pins_count(board):
+    true_pins_count = None
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.execute("SELECT pin_count FROM stage1 WHERE board_url=?",(board,)).fetchone()
+            conn.commit()
+            true_pins_count = cursor[0]
+
+    except Exception as e :
+        print(f"[ERROR] cannot get true pins count!, because of {e}")
+        time.sleep(1)
+        return get_true_pins_count(board)
+    return true_pins_count
+
+
+
+def get_board_urls(search_term):
+    returns = []
+    #cmd = "select board_url from stage1"
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.execute("SELECT board_url from stage1 WHERE search_term=?",(search_term,))
+            conn.commit()
+            for i in cursor:
+                returns.append(i[0])
+
+    except Exception as e :
+        print(f"[ERROR] cannot get the boards urls!, because of {e}")
+        time.sleep(1)
+        return get_board_urls(search_term)
+    return returns
+
+# def get_search_term():
+#     cmd = "select search_term from stage1 LIMIT 1;"
+#     try:
+#         with sqlite3.connect(DATABASE_PATH) as conn:
+#             cursor = conn.execute(cmd)
+#             conn.commit()
+#             for i in cursor:
+#                 return i[0]
+#     except:
+#         time.sleep(1)
+#         return get_search_term()
+
+
+
+class Stage2: 
+    def __init__(self,search_term) -> None:
+        self.search_term = search_term
+    
+    def run(self) -> None: 
+        """
+            function that executes the second stage of Pintrest scraping, which is retrieveing the board urls which was collected 
+            in stage 1 and goes in them 1 by one to collect all pens urls within those boards and storing the pin urls inside the sqlite DB. 
+        """
+        
+        board_urls = get_board_urls(self.search_term)
+    
+        process(board_urls)
+
+        board_pins_count_report(self.search_term)
+
+        #output_json_file()
+ 
+        return 
+
+
+# def set_board_is_scraped(url):
+#     cmd = "update stage1 set scraped = 1 where board_url = '"+url+"';"
+#     try:
+#         with sqlite3.connect(DATABASE_PATH) as conn:
+#             conn.execute(cmd)
+#             conn.commit()
+#     except Exception as e:
+#         print(str(e))
+#         time.sleep(1)
+#         return set_board_is_scraped(url)
+    
         
 # def output_json_file():
 #     json_data = []
@@ -191,73 +277,7 @@ def process(board_list):
 #     with open(file_out_path, 'w') as outfile:
 #         outfile.write(json_string)
 
-def get_board_urls():
-    returns = []
-    cmd = "select board_url from stage1"
-    try:
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            cursor = conn.execute(cmd)
-            conn.commit()
-            for i in cursor:
-                returns.append(i[0])
-    except:
-        time.sleep(1)
-        return get_board_urls()
-    return returns
-
-def get_search_term():
-    cmd = "select search_term from stage1 LIMIT 1;"
-    try:
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            cursor = conn.execute(cmd)
-            conn.commit()
-            for i in cursor:
-                return i[0]
-    except:
-        time.sleep(1)
-        return get_search_term()
-
-# def set_board_is_scraped(url):
-#     cmd = "update stage1 set scraped = 1 where board_url = '"+url+"';"
-#     try:
-#         with sqlite3.connect(DATABASE_PATH) as conn:
-#             conn.execute(cmd)
-#             conn.commit()
-#     except Exception as e:
-#         print(str(e))
-#         time.sleep(1)
-#         return set_board_is_scraped(url)
-    
-class Stage2: 
-    def __init__(self) -> None:
-        pass
-    
-    def run(self) -> None: 
-        """
-            function that executes the second stage of Pintrest scraping, which is retrieveing the board urls which was collected 
-            in stage 1 and goes in them 1 by one to collect all pens urls within those boards and storing the pin urls inside the sqlite DB. 
-        """
-        
-        board_urls = get_board_urls()
-    
-        process(board_urls)
-
-        #output_json_file()
- 
-        return 
-
-if __name__ == '__main__':
-    try:
-        for i in range(len(sys.argv)):
-            if(sys.argv[i] == '-o'):
-                file_out_path = sys.argv[i+1]
-                break
-    except:
-        print("file_out_path is not set yet!")
-
-    board_urls = get_board_urls()
-    
-    process(board_urls)
-
-    #output_json_file()
+# if __name__ == '__main__':
+#     stage2 = Stage2()
+#     stage2.run()
     

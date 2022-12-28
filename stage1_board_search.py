@@ -12,6 +12,10 @@ class Stage1:
     def __init__(self, search_term):
         self.search_term = search_term
         self.all_data = {}
+        self.driver = None
+        self.db_conn = None
+    
+    def __start_connections(self):
         self.db_conn  = self.__initiate_db_conn() 
         self.driver = init_driver()
 
@@ -128,7 +132,8 @@ class Stage1:
         self.driver.quit()
             
     def run(self):
-        """main function of the program"""        
+        """main function of the program"""   
+        self.__start_connections()     
         self.get_board_search_result()
 
         for url in self.all_data:

@@ -30,12 +30,15 @@ def pintrest_scraper_cli(
     #initialize instance of each stage.
     stages = {} 
     stages[1] = Stage1(search_term)        
-    stages[2] = Stage2()        
+    stages[2] = Stage2(search_term)        
     stages[3] = Stage3()        
     stages[4] = Stage4()     
     
-    for stage_no in range(1, 5): 
+    for stage_no in range(1, 5):
+
         if stage_no in stages_to_execute: 
+            
+            print(f"[INFO] starting stage {stage_no}")
             
             if stage_no == 1: 
                 stages[stage_no].run()
@@ -48,6 +51,5 @@ def pintrest_scraper_cli(
 
 
 if __name__ == "__main__": 
-    
     fire.Fire(pintrest_scraper_cli)
     
