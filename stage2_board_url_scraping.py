@@ -66,19 +66,20 @@ class window:
     board_url= None
     ending_count = 0
     pin_count = 0
-    def __init__(self,progress_bar,args):
+    def __init__(self,progress_bar,board_url,args):
         self.progress_bar = progress_bar
         self.args = args
-
-    def start(self, board_url):
-        self.load_board_page(board_url)
-        self.get_link_pin()
-
-    def load_board_page(self, board_url):
-        self.all_links = {}
+        self.retries = 2
         self.board_url = board_url
         sel = Sel(self.args)
         self.driver = sel.get_driver()
+
+    def start(self):
+        self.load_board_page()
+        self.get_link_pin()
+
+    def load_board_page(self):
+        self.all_links = {}
         self.driver.set_page_load_timeout(3000)
         try:
             self.driver.get(self.board_url)
@@ -93,7 +94,7 @@ class window:
             if(self.count_load_failt == 4):
                 return
             else:
-                self.load_board_page(board_url)
+                self.start()
 
        
         
@@ -114,7 +115,8 @@ class window:
                             pin_links.append(href)
                             self.all_links[href.replace("https://www.pinterest.com","")] = None
                 self.driver.execute_script("arguments[0].scrollIntoView(true);",last_link)
-                time.sleep(1)
+                #sleep for two sec after scrolling the last link to viewport to prevent stale element reference
+                time.sleep(2)
                 links = main_content.find_elements(By.TAG_NAME,"a")
             self.push_pin_links_to_database(pin_links)
             global total_pins
@@ -126,8 +128,18 @@ class window:
             self.driver.quit()
         except Exception as e:
             print(e)
-            
-   
+            if (self.retries):
+                print(f"\nEncountered error scraping {self.board_url}")
+                print("Retrying in 2 seconds...")
+                time.sleep(2)
+                self.start()
+                self.retries -= 1
+                return
+            else:
+                print(f"\nSkipping board {self.board_url} due to error.")
+                self.driver.close()
+                self.driver.quit()
+                return
             
     def push_pin_links_to_database(self, pin_urls):
         cmd = 'INSERT INTO stage2(board_url, pin_url) values'
@@ -162,8 +174,8 @@ def process(board_list,progress_bar,args):
     with ThreadPoolExecutor(max_workers=args["max_pin_threads"]) as executor:
         for i in range(len(board_list)):
             board_url = board_list[i]
-            win = window(progress_bar,args)
-            executor.submit(win.start,board_url)
+            win = window(progress_bar,board_url,args)
+            executor.submit(win.start)
     push_total_image_count()
     print(f"\nTotal Pins: {total_pins}")
 

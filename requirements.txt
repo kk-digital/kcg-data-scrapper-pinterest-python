@@ -31,3 +31,4 @@ lxml==4.9.2
 proxy_checking==0.0
 undetected_chromedriver==3.1.7
 progress==1.6
+mega.py==1.0.8

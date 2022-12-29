@@ -1,8 +1,10 @@
+import time
 import fire
 from sel import Sel 
 from stage1_board_search import Stage1
-from stage2_board_url_scraping import Stage2 
-from stage3_download_images import Stage3
+from stage2_board_url_scraping import Stage2
+from stage3_get_unique_pins import Stage3 
+from stage4_download_images import Stage4
 from typing import List
 
 
@@ -42,20 +44,22 @@ def pintrest_scraper_cli(
     print("Initalizing chrome driver...")
     stages = {} 
     stages[1] = Stage1(parsed_args)        
-    stages[2] = Stage2(parsed_args)
-    #we can get rid of stage three since there won't be duplicated links        
-    #stages[3] = Stage3()        
-    stages[3] = Stage3()     
+    stages[2] = Stage2(parsed_args)     
+    stages[3] = Stage3()        
+    stages[4] = Stage4()     
     
-    for stage_no in range(1, 4): 
+    start_time = time.time()
+    for stage_no in range(1, 5): 
         if stage_no in stages_to_execute: 
             
             if stage_no == 1: 
                 stages[stage_no].run(search_term)
-            elif stage_no == 3: 
+            elif stage_no == 4: 
                 stages[stage_no].run(max_scrape_theads)
             else: 
                 stages[stage_no].run()
+    end_time = time.time()
+    print(f"Program finished in {end_time-start_time}")
             
     return 
 

@@ -1,5 +1,7 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from genericpath import isdir
+import json
+import threading
 from lxml import html
 import sqlite3
 import subprocess
@@ -23,7 +25,10 @@ import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
 from lxml import etree
 from progress.bar import ChargingBar
-
+from mega import Mega
+import getpass
+from progress.spinner import LineSpinner 
+import speedtest
 # Paths will be used in the script
 out_folder = 'outputs'
 os.makedirs(out_folder, exist_ok=True)
@@ -37,7 +42,7 @@ maximum_download_theads = 40
 DATABASE_PATH = 'database.db'
 MEGA_FOLDER_LINK = ""
 similar_pin_urls = []
-
+is_file_upload_done = False
 
 def next_dataset_index():
     """ Getting the index of the new dataset """
@@ -368,51 +373,40 @@ class rar:
                     # Add file to zip
                     zipObj.write(filePath, os.path.basename(filePath))
 
-class chrome:
-    def initDriver(IS_HEADLESS=False) -> webdriver:
-        options = uc.ChromeOptions()
-        user_data_dir = f"{os.getcwd()}/chrome"
-        return uc.Chrome(options=options,user_data_dir=user_data_dir)
-    def upload_to_mega(self):
-        global RAR_PATH
-        driver = self.initDriver()
-        driver.get(MEGA_FOLDER_LINK)
+class Mega_:
+    def upload(self):
         try:
-            element = WebDriverWait(driver, 60).until(
-                EC.presence_of_element_located((By.NAME, "dashboard"))
-            )
-        except:
-            print('Waitting Error!!')
-        time.sleep(5)
-        number = 0
-        r = rar()
-        for file in r.get_rar_path():
-            random_name = RAR_PATH + '/' + str(database.get_search_term()) + "_" +\
-                str(number) + '.rar'
-            number += 1
+            mega_conf = json.load(open("mega_conf.json"))
+            email = ""
+            password = ""
+            if mega_conf["email"] == "" or mega_conf["password"] == "":
+                    email = input("Enter Mega Email: ")
+                    password = getpass.getpass("Enter Mega Password: ")
+            mega = Mega()
+            user = mega.login(email, password)
+            progress_indicator = threading.Thread(target = self.show_upload_progress)
+            progress_indicator.start()
+            user.upload(latest_file(RAR_PATH))
+            is_file_upload_done = True
+            progress_indicator.join()
+            print("\nFile uploaded.")
+        except Exception as e:
+            print(f"Error uploading file: {str(e)}")
+            return
 
-            os.rename(file, random_name)
-            driver.find_element(By.ID, "fileselect3").send_keys(random_name)
+    def show_upload_progress(self):
+        progress = LineSpinner(message=f"Uploading {self.get_uploading_file_name()} to mega {self.get_uploading_file_size()} Mb: ")
+        while(not is_file_upload_done):
+            progress.next()
 
-        count = 0
-        while(1):
-            x = driver.find_elements(
-                By.CLASS_NAME, 'transfer-task-row upload sprite-fm-mono icon-up progress')
-            y = driver.find_elements(
-                By.CLASS_NAME, 'transfer-task-row upload')
+    def get_uploading_file_size(self):
+        file_size_in_mb = os.path.getsize(latest_file(RAR_PATH))/1000000
+        return "{:.2f}".format(file_size_in_mb)
 
-            if(len(x) == 0 and len(y) == 0):
-                count += 1
-            else:
-                count = 0
-            if(count == 5):
-                break
-            time.sleep(2)
-        input("ENTER WHEN DONE")
-        driver.quit()
+    def get_uploading_file_name(self):
+        return os.path.basename(latest_file(RAR_PATH))
 
-
-class Stage3: 
+class Stage4: 
     def __init__(self) -> None:
         pass
     
@@ -422,8 +416,7 @@ class Stage3:
         print(f"Scraper found {total_images} images")
         print(f"{len(similar_pin_urls)} similar images found")
         print(f"Out of {total_images} images {total_images-len(failed_links)-len(similar_pin_urls)} downloaded")
-        print("Display more info on errors? (y/n)")
-        res = input()
+        res = input("Display more info on errors? (y/n) ")
         if res == 'y':
             print("Similar Images Link: ")
             print(similar_pin_urls)
@@ -435,7 +428,7 @@ class Stage3:
 
     def run(self, maximum_scrape_theads = 4) -> None:
         global failed_download_links
-        print("\nStarted stage 3")
+        print("\nStarted stage 4")
         database.delete_pin_is_downloading()
         database.delete_pin_is_downloading_imageurl()
         pin_urls = database.get_pin_url()
@@ -463,13 +456,16 @@ class Stage3:
 
         r = rar()
         r.add_to_rar_file()
-        print("Finished stage 3")
+
+        res = input("Do you want to upload data? (y/n) ")
+        if res.capitalize() == 'Y':
+            print("Uploading to mega...")
+            mega = Mega_()
+            mega.upload()
+        print("Finished stage 4")
         self.display_report()
-        # c = chrome()
-        # c.upload_to_mega()
  
 
 if __name__ == '__main__':
-
-    stage3 = Stage3()     
-    stage3.run()
+    stage4 = Stage4()
+    stage4.run()
