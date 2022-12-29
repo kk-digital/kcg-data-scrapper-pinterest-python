@@ -332,13 +332,7 @@ class rar:
 
         os.makedirs(RAR_PATH, exist_ok=True)
         FOLDER_PATH = latest_file(PARENT_FOLDER_PATH)
-        
-        print(f"[INFO] FOLDER WILL BE ZIPPED : {FOLDER_PATH}")
-        
         files = [f for f in listdir(FOLDER_PATH) if isfile(join(FOLDER_PATH, f))]
-        
-        print(f"[INFO] {len(files)} will be zipped ")
-        
         self.create_rar_file(FOLDER_PATH, os.path.basename(FOLDER_PATH))
 
     def copy_to(self, from_file, to_folder):
@@ -413,9 +407,11 @@ class Stage3:
     def display_report(self):
         total_images = database.get_total_images()
         failed_links = database.get_failed_pin_links()
-        print(f"Scraper found {total_images} images")
+        print(f"\n\nScraper found {total_images} images")
         print(f"{len(similar_pin_urls)} similar images found")
-        print(f"Out of {total_images} images {total_images-len(failed_links)-len(similar_pin_urls)} downloaded")
+        print(f"Out of {total_images} images {total_images-len(failed_links.keys())-len(similar_pin_urls)} downloaded")
+        if len(failed_links) != 0:
+            print(f"{len(failed_links.keys())} images failed to download.")
         res = input("Display more info on errors? (y/n) ")
         if res == 'y':
             print("Similar Images Link: ")
