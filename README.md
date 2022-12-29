@@ -41,3 +41,10 @@ python ./PinterestScraper.py --stages_to_execute=[3,4]
 
 * `maximum_scrape_theads` _[int]_ - _[optional]_ Maximum number of threads used in scraping the pins, default is `2` threads
 
+* `maximum_pin_threads` _[int]_ - [optional]_ Maximum number of threads to use when scraping boards,
+defauult is `2` threads
+
+* `use_proxy` _[bool]_ - [optional]_ Weather to use a proxy server when scrapping,
+default is `False`
+
+* `board_limit` _[int]_ - [optional]_ Maximum number of boards to scrap default is no limit
