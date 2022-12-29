@@ -406,7 +406,7 @@ class Mega_:
     def get_uploading_file_name(self):
         return os.path.basename(latest_file(RAR_PATH))
 
-class Stage4: 
+class Stage3: 
     def __init__(self) -> None:
         pass
     
@@ -457,15 +457,11 @@ class Stage4:
         r = rar()
         r.add_to_rar_file()
 
-        res = input("Do you want to upload data? (y/n) ")
-        if res.capitalize() == 'Y':
-            print("Uploading to mega...")
-            mega = Mega_()
-            mega.upload()
+       
         print("Finished stage 4")
         self.display_report()
  
 
 if __name__ == '__main__':
-    stage4 = Stage4()
-    stage4.run()
+    stage3 = Stage3()
+    stage3.run()
