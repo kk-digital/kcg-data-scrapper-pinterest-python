@@ -93,7 +93,7 @@ def insert_data_into_database(arg1, arg2):
         if(str(e).find('lock') != -1 or str(e).find('attempt to write a readonly database') != -1):
             time.sleep(1)
 
-def scrap_all_board_urls(driver,search_term,args):
+def scrape_board_urls(driver,search_term,args):
     print(f"Starting scraping boards for {search_term}")
     driver.set_page_load_timeout(3000)
     driver.get(
@@ -152,7 +152,7 @@ class Stage1:
         sel = Sel(self.args)
         driver = sel.get_driver()
         search_term = search_term
-        scrap_all_board_urls(driver, search_term,self.args)
+        scrape_board_urls(driver, search_term,self.args)
         driver.close()
         driver.quit()
         

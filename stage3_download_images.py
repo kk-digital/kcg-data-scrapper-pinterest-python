@@ -28,7 +28,7 @@ from progress.bar import ChargingBar
 from mega import Mega
 import getpass
 from progress.spinner import LineSpinner 
-import speedtest
+
 # Paths will be used in the script
 out_folder = 'outputs'
 os.makedirs(out_folder, exist_ok=True)
