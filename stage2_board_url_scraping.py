@@ -266,7 +266,7 @@ class Stage2:
         progress_bar = ChargingBar('',max=len(board_urls),suffix='%(percent)d%% - %(index)d/%(max)d')
         process(board_urls,progress_bar,self.args)
         output_json_file()
-        print("Finished stage 2")
+        print("Finished scraping pin urls")
         return 
 
 if __name__ == '__main__':

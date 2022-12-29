@@ -233,13 +233,13 @@ class database:
     @staticmethod
     def get_failed_pin_links():
         cmd = "select pin_url,error from failed_pin_links"
-        returns = []
+        returns = {}
         try:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 cursor = conn.execute(cmd)
                 conn.commit()
                 for i in cursor:
-                    returns.append(i[0])
+                    returns[i[0]]  = i[1]
                 return returns
         except Exception as e:
             print(str(e))
@@ -428,7 +428,6 @@ class Stage3:
 
     def run(self, maximum_scrape_theads = 4) -> None:
         global failed_download_links
-        print("\nStarted stage 4")
         database.delete_pin_is_downloading()
         database.delete_pin_is_downloading_imageurl()
         pin_urls = database.get_pin_url()
@@ -437,7 +436,7 @@ class Stage3:
             print("Scraped all image link")
 
         else:
-            print(f"Scraping pins for image source link...")
+            print(f"\nScraping pins for image source link...")
             pin_progress_bar = ChargingBar("",max=len(pin_urls),suffix='%(percent)d%% - %(index)d/%(max)d')
             pin = pins()
             with ThreadPoolExecutor(max_workers=maximum_scrape_theads) as executor:
@@ -458,7 +457,7 @@ class Stage3:
         r.add_to_rar_file()
 
        
-        print("Finished stage 4")
+        print("Finished program execution.")
         self.display_report()
  
 

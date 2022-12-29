@@ -169,7 +169,7 @@ class Stage1:
                 f.write(str(data[2]))
                 f.write("\n")
                 insert_data_into_database(search_term, str(url))
-        print(f"Finished stage 1, found {len(all_data.keys())} boards.")
+        print(f"Finished scraping boards, found {len(all_data.keys())} boards.")
 
 if __name__ == '__main__':
     stage1 = Stage1() 
