@@ -145,6 +145,10 @@ def main(search_term):
             if time.time() - start_time > TIMEOUT:
                 print(f"[WARNING] NO CHANGE IN PAGE IN {TIMEOUT} SECONDS")
                 break
+
+            if old_scroll_height == new_scroll_height:
+                print("[WARNING] SCROLL HEIGHT IS THE SAME")
+                break
             
             if page_hash != get_page_hash(driver):
                 print("[INFO] PAGE CHANGED")
