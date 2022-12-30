@@ -16,7 +16,7 @@ all_data = []
 SCROLL_IDLE_TIME = 3
 POLL_TIME = 1
 SCROLL_TIMEOUT = 10
-TRIGGER_STOP = 5 # If your internet connection is slow, increase this number.
+TRIGGER_STOP = 3 # If your internet connection is slow, increase this number.
 RESIZE_WAIT_TIME = 10
 TIMEOUT = 10
 
@@ -58,7 +58,6 @@ def get_board_name(soup_a):
         except Exception as e:
             continue
 
-
 def get_boards(html):
     
     soup = BeautifulSoup(html, 'html.parser')
@@ -92,7 +91,6 @@ def get_boards(html):
 
 def scrape_boards_urls(driver):
     tag_div = driver.find_element(By.XPATH , "//div[@class='gridCentered']")
-    #tag_div = driver.find_element(By.XPATH, "//body")
     return get_boards(tag_div.get_attribute('innerHTML'))
 
 
@@ -125,10 +123,8 @@ def main(search_term):
     search_term = search_term.replace(" ", "%20")
     driver.get(f"https://www.pinterest.com/search/boards/?q={search_term}&rs=filter")
 
-    timeout_counter = 0
+    
     trigger_counter = 0
-    height = 0 # summation of all scroll heights 
-
     while True:
         page_hash  = get_page_hash(driver)
 
@@ -155,17 +151,12 @@ def main(search_term):
                 break
 
 
-        if old_scroll_height != new_scroll_height:
-            height += new_scroll_height
-
         if old_scroll_height == new_scroll_height and page_hash == get_page_hash(driver):
             trigger_counter += 1
-
 
         if trigger_counter == TRIGGER_STOP:
             width, _ = get_page_current_width_height(driver)
             height   = driver.execute_script("return Math.max( document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );")
-
             driver.set_window_size(width=width, height=height) ## works also 
             time.sleep(RESIZE_WAIT_TIME)
             print(f"[INFO] ALL HEIGHT {height}")
