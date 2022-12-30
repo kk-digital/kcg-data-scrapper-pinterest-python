@@ -140,30 +140,32 @@ def main(search_term):
         new_scroll_height = get_scroll_height(driver)
 
         print(f"[INFO] SCROLL  HEIGHT: {new_scroll_height}")
+
         # scroll timeout loop
-        timeout_counter = 0 
         start_time = time.time()
         while True:
             time.sleep(POLL_TIME) # wait 0.5 seconds and check 
 
             if time.time() - start_time > TIMEOUT:
-                timeout_counter += 1
-                print(f"[WARNING] NO CHANGE IN PAGE IN {timeout_counter*TIMEOUT} SECONDS")
-                start_time = time.time()
+                print(f"[WARNING] NO CHANGE IN PAGE IN {TIMEOUT} SECONDS")
+                break
             
             if page_hash != get_page_hash(driver):
                 print("[INFO] PAGE CHANGED")
                 break
 
-            if timeout_counter == TRIGGER_STOP:
-                print("[INFO] END OF THE PAGE")
-                break
 
         if old_scroll_height != new_scroll_height:
             height += new_scroll_height
 
-        if timeout_counter == TRIGGER_STOP:
+        if old_scroll_height == new_scroll_height and page_hash == get_page_hash(driver):
+            trigger_counter += 1
+
+
+        if trigger_counter == TRIGGER_STOP:
             width, _ = get_page_current_width_height(driver)
+            height   = driver.execute_script("return Math.max( document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );")
+
             driver.set_window_size(width=width, height=height) ## works also 
             time.sleep(RESIZE_WAIT_TIME)
             print(f"[INFO] ALL HEIGHT {height}")
@@ -172,37 +174,6 @@ def main(search_term):
             driver.close()
             break
         
-
-
-        # new_scroll_height                = get_scroll_height(driver)
-        # page_hash_new                    = get_page_hash(driver)
-
-        # print(f"[INFO] SCROLL OLD HEIGHT: {old_scroll_height} , NEW HEIGHT: {new_scroll_height}")
-        
-        # if new_scroll_height == old_scroll_height:
-        #     print("[INFO] SAME HEIGHT")
-        #     trigger_counter += 1
-        # else:
-        #     trigger_counter = 0  
-        #     height += new_scroll_height
-        #     #height += old_scroll_height
-
-        # if page_hash_new == page_hash: 
-        #     print("[WARNING] SAME HASH - SAME PAGE")
-        # else:
-        #     print("[INFO] NEW PAGE LOADED")
-
-        # if trigger_counter == TRIGGER_STOP and page_hash_new == page_hash:
-        #     #driver.execute_script("document.body.style.zoom='50%'")
-        #     #driver.set_window_rect(x=0,y=0,width=new_page_width, height=height) ##==> works 
-        #     width, _ = get_page_current_width_height(driver)
-        #     driver.set_window_size(width=width, height=height) ## works also 
-        #     time.sleep(RESIZE_WAIT_TIME)
-        #     print(f"[INFO] ALL HEIGHT {height}")
-        #     print("[INFO] ALL PAGE LOADED")
-        #     scrape_boards_urls(driver)
-        #     driver.close()
-        #     break
 
 if __name__ == "__main__":
     main(search_term="bears")
