@@ -148,7 +148,7 @@ def main(search_term):
 
             if time.time() - start_time > TIMEOUT:
                 timeout_counter += 1
-                print(f"[WARNING] NO CHANGE IN PAGE IN {TIMEOUT} SECONDS")
+                print(f"[WARNING] NO CHANGE IN PAGE IN {timeout_counter*TIMEOUT} SECONDS")
                 start_time = time.time()
             
             if page_hash != get_page_hash(driver):
