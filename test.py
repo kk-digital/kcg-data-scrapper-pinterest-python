@@ -10,17 +10,17 @@ from selenium.common.exceptions import TimeoutException
 
 # global 
 urls = []
-
+all_data = []
+        
 # constants
 SCROLL_IDLE_TIME = 3
 POLL_TIME = 1
 SCROLL_TIMEOUT = 10
 TRIGGER_STOP = 5 # If your internet connection is slow, increase this number.
 RESIZE_WAIT_TIME = 10
+TIMEOUT = 10
 
 
-all_data = []
-        
 def find_comma(str):
     """Find comma in the pins number to switch it in integer."""
     for i in range(len(str)):
@@ -131,51 +131,78 @@ def main(search_term):
 
     while True:
         page_hash  = get_page_hash(driver)
+
         old_scroll_height = get_scroll_height(driver)
+        scroll_down(driver)
+        time.sleep(SCROLL_IDLE_TIME)
+        scroll_down(driver=driver)
+        time.sleep(SCROLL_IDLE_TIME)
+        new_scroll_height = get_scroll_height(driver)
 
-        try:
-            scroll_down(driver)
-            time.sleep(SCROLL_IDLE_TIME)
-            scroll_down(driver=driver)
-            time.sleep(SCROLL_IDLE_TIME)
-
+        print(f"[INFO] SCROLL  HEIGHT: {new_scroll_height}")
+        # scroll timeout loop
+        timeout_counter = 0 
+        start_time = time.time()
+        while True:
             time.sleep(POLL_TIME) # wait 0.5 seconds and check 
 
-        except TimeoutException:
-            print("[WARNING] SCROLL TIMEOUT")
-            timeout_counter += 1
-            continue
+            if time.time() - start_time > TIMEOUT:
+                timeout_counter += 1
+                print(f"[WARNING] NO CHANGE IN PAGE IN {TIMEOUT} SECONDS")
+                start_time = time.time()
+            
+            if page_hash != get_page_hash(driver):
+                print("[INFO] PAGE CHANGED")
+                break
 
-        new_scroll_height                = get_scroll_height(driver)
-        page_hash_new                    = get_page_hash(driver)
-        new_page_width, new_page_height  = get_page_current_width_height(driver)
+            if timeout_counter == TRIGGER_STOP:
+                print("[INFO] END OF THE PAGE")
+                break
 
-        print(f"[INFO] SCROLL OLD HEIGHT: {old_scroll_height} , NEW HEIGHT: {new_scroll_height}")
-        
-
-        if new_scroll_height == old_scroll_height:
-            print("[INFO] SAME HEIGHT")
-            trigger_counter += 1
-        else:
-            trigger_counter = 0  
+        if old_scroll_height != new_scroll_height:
             height += new_scroll_height
-            #height += old_scroll_height
 
-        if page_hash_new == page_hash: 
-            print("[WARNING] SAME HASH - SAME PAGE")
-        else:
-            print("[INFO] NEW PAGE LOADED")
-
-        if trigger_counter == TRIGGER_STOP and page_hash_new == page_hash:
-            #driver.execute_script("document.body.style.zoom='50%'")
-            #driver.set_window_rect(x=0,y=0,width=new_page_width, height=height) ##==> works 
-            driver.set_window_size(width=new_page_width, height=height) ## works also 
+        if timeout_counter == TRIGGER_STOP:
+            width, _ = get_page_current_width_height(driver)
+            driver.set_window_size(width=width, height=height) ## works also 
             time.sleep(RESIZE_WAIT_TIME)
             print(f"[INFO] ALL HEIGHT {height}")
             print("[INFO] ALL PAGE LOADED")
             scrape_boards_urls(driver)
             driver.close()
             break
+        
+
+
+        # new_scroll_height                = get_scroll_height(driver)
+        # page_hash_new                    = get_page_hash(driver)
+
+        # print(f"[INFO] SCROLL OLD HEIGHT: {old_scroll_height} , NEW HEIGHT: {new_scroll_height}")
+        
+        # if new_scroll_height == old_scroll_height:
+        #     print("[INFO] SAME HEIGHT")
+        #     trigger_counter += 1
+        # else:
+        #     trigger_counter = 0  
+        #     height += new_scroll_height
+        #     #height += old_scroll_height
+
+        # if page_hash_new == page_hash: 
+        #     print("[WARNING] SAME HASH - SAME PAGE")
+        # else:
+        #     print("[INFO] NEW PAGE LOADED")
+
+        # if trigger_counter == TRIGGER_STOP and page_hash_new == page_hash:
+        #     #driver.execute_script("document.body.style.zoom='50%'")
+        #     #driver.set_window_rect(x=0,y=0,width=new_page_width, height=height) ##==> works 
+        #     width, _ = get_page_current_width_height(driver)
+        #     driver.set_window_size(width=width, height=height) ## works also 
+        #     time.sleep(RESIZE_WAIT_TIME)
+        #     print(f"[INFO] ALL HEIGHT {height}")
+        #     print("[INFO] ALL PAGE LOADED")
+        #     scrape_boards_urls(driver)
+        #     driver.close()
+        #     break
 
 if __name__ == "__main__":
     main(search_term="bears")
