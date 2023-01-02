@@ -1,8 +1,7 @@
 import fire 
 from stage1_board_search import Stage1
 from stage2_board_url_scraping import Stage2 
-from stage3_get_unique_pins import Stage3 
-from stage4_download_images import Stage4
+from stage3_download_images import Stage3
 from typing import List
 import os 
 
@@ -32,7 +31,6 @@ def pintrest_scraper_cli(
     stages[1] = Stage1(search_term)        
     stages[2] = Stage2(search_term)        
     stages[3] = Stage3()        
-    stages[4] = Stage4()     
     
     for stage_no in range(1, 5):
 

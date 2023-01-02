@@ -346,7 +346,7 @@ class rar:
                     zipObj.write(filePath, os.path.basename(filePath))
 
 
-class Stage4: 
+class Stage3: 
     def __init__(self) -> None:
         pass
 
