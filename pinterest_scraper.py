@@ -30,7 +30,7 @@ def pintrest_scraper_cli(
     stages = {} 
     stages[1] = Stage1(search_term)        
     stages[2] = Stage2(search_term)        
-    stages[3] = Stage3()        
+    stages[3] = Stage3(search_term)        
     
     for stage_no in range(1, 5):
 

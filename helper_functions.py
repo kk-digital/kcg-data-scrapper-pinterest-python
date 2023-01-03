@@ -56,16 +56,21 @@ def create_database():
     # stage 2 table structure 
     cmd2 = '''CREATE TABLE stage2 (
     board_url  TEXT,
-    pin_url    TEXT,
-    downloaded INTEGER DEFAULT (0) 
+    pin_url    TEXT
     );
     '''
+    # # image_url table structure
+    # cmd3 = '''CREATE TABLE image_url (
+    # url        TEXT    NOT NULL
+    #                    PRIMARY KEY,
+    # downloaded INTEGER DEFAULT (0) 
+    # );'''
     # image_url table structure
     cmd3 = '''CREATE TABLE image_url (
-    url        TEXT    NOT NULL
-                       PRIMARY KEY,
-    downloaded INTEGER DEFAULT (0) 
+    pin_url        TEXT    NOT NULL PRIMARY KEY,
+    img_url        TEXT    NOT NULL
     );'''
+
     db = sqlite3.connect(DATABASE_PATH)
     c = db.cursor()
     c.execute('PRAGMA encoding="UTF-8";')

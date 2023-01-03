@@ -18,6 +18,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from os.path import isfile, join
 from zipfile import ZipFile
 import glob
+from bs4 import BeautifulSoup
+import concurrent.futures
 
 
 
@@ -62,6 +64,40 @@ def latest_file(folder):
     return latest_file
 
 class database:
+    @staticmethod
+    def get_pins_for_board(board_url):
+        returns= []
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT pin_url from stage2 WHERE board_url=?",(board_url,)).fetchall()
+                conn.commit()
+                for i in cursor:
+                    returns.append(i[0])
+
+        except Exception as e :
+            print(f"[ERROR] cannot count pins in stage2 in board {board_url}!, because of {e}")
+            time.sleep(1)
+            return database.count_pins_in_board(board_url)
+        return returns
+
+
+    @staticmethod
+    def get_board_urls(search_term):
+        """returns a list of boards urls from stage1 table using the search term """
+        returns = []
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT board_url from stage1 WHERE search_term=?",(search_term,))
+                conn.commit()
+                for i in cursor:
+                    returns.append(i[0])
+
+        except Exception as e :
+            print(f"[ERROR] cannot get the boards urls!, because of {e}")
+            time.sleep(1)
+            return database.get_board_urls(search_term)
+        return returns
+
     @staticmethod
     def get_search_term():
         cmd = "select search_term from stage1 LIMIT 1;"
@@ -245,7 +281,7 @@ class images:
 
 
 class pins:
-    def __init__(self) -> None:
+    def __init__(self):
         self.pin_urls = None
         self.is_done = True
 
@@ -266,30 +302,20 @@ class pins:
         self.is_done = False
         try:
             page = requests.get(pin_url).text
-        except:
-            try:
-                page = requests.get(pin_url).text
-            except Exception as e:
-                print(str(e))
-                if(str(e).find("conn") != -1):
-                    self.sub_scrape_image(pin_url)
-                    print(f"[WARNING] {pin_url} has a problem!")
-                    return
-                print(f"[WARNING] {pin_url} has a problem!")
+            soup = BeautifulSoup(page, 'html.parser')
+            image_url = soup.find("img")["src"]
+            database.push_image_url_into_database(image_url)
+
+        except Exception as e:
+            print(str(e))
+            if(str(e).find("conn") != -1):
+                self.sub_scrape_image(pin_url)
+                print(f"[WARNING] {pin_url} failed; error: {e}")
                 return
-        start = page.find("https://i.pinimg.com/original")
-        if(start == -1):
-            print(pin_url)
-            print(f"[WARNING] {pin_url} has a problem!")
-            return
+            print(f"[WARNING] {pin_url} failed; error: {e}")
 
-        end = start+30
-        while(page[end] != '"'):
-            end += 1
-        image_url = page[start:end]
-        database.push_image_url_into_database(image_url)
-
-
+        return
+        
 class rar:
     def get_rar_path(self):
         global RAR_PATH
@@ -347,125 +373,246 @@ class rar:
 
 
 class Stage3: 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, search_term,max_workers=10):
+        self.max_workers = max_workers
+        self.search_term = search_term 
+        self.board_pins_dict = {}
+        self.scraped_pin_url = {}
+        self.parent_directory  = os.path.join('outputs','datasets')
+        self.zip_output_folder = os.path.join('outputs','dataset-zip-files') 
+        folder_index = self.__next_dataset_index()
+        self.folder_name = f"images-{folder_index:04n}"
+        self.output_folder = os.path.join(self.parent_directory,self.folder_name)
+        self.__create_folders()
 
-    def run(self, maximum_scrape_theads = 2) -> None:
+    def __create_folders(self):
+        os.makedirs(self.parent_directory, exist_ok=True)               
+        os.makedirs(self.zip_output_folder, exist_ok=True)
+        os.makedirs(self.output_folder, exist_ok=True)
+
+    
+    def __next_dataset_index(self):
+        """ Getting the index of the new dataset """
+        try:
+            indices = []
+            for dataset in os.listdir(self.parent_directory):
+                try :
+                    indices.append(int(dataset.split("-")[1]))
+                    continue
+                except Exception as e:
+                    print(f"[WARINING] {dataset} has a problem")            
+                    try:
+                        indices.append(max(indices)+1)
+                    except ValueError: # indices list is empty 
+                        indices.append(1)
+
+            return max(indices) + 1
         
-        database.delete_pin_is_downloading()
-        database.delete_pin_is_downloading_imageurl()
-        pin_urls = database.get_pin_url()
+        except ValueError:
+            return 1    
+        
+    def __download_all_images(self):
+        for board in self.board_pins_dict:
+            board_name = board.split('/')[-2]
+            print(f"[INFO] DOWNLOADING BOARD {board_name}")
+            os.makedirs(os.path.join(self.output_folder,board_name),exist_ok=True)               
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = []
+                for pin in self.board_pins_dict[board]:
+                    image_url = self.__get_image_url_from_pin(pin)
+                    if image_url is None:
+                        continue
+                    a_result = executor.submit(self.__download_image, board_name,image_url)
+                    futures.append(a_result)
+        
+                for future in concurrent.futures.as_completed(futures):
+                    future.result()
 
-        if(pin_urls == None):
-            print("Scraped all image link")
+    def __download_image(self,board_name,image_url):
+        file_path = os.path.join(self.output_folder,board_name,image_url.replace(":", "_").replace("/", "_"))
+        if(os.path.exists(file_path)):
+            print(f"[INFO] {image_url} ALREADY EXISTS")
+            return
 
-        else:
-            pin = {}
-            temp_pin_urls = {}
-            for x in range(maximum_scrape_theads):
-                pin[x] = pins()
-                temp_pin_urls[x] = None
-            count = 0
-            threads = []
-            while(len(pin_urls) != 0):
-                for x in range(maximum_scrape_theads):
-                    time.sleep(1)
+        print(f"[INFO] DOWNLOADING: {image_url} ")
+        no_of_tries = 0 
+        try:
+            r = requests.get(image_url, stream=True, timeout=60)
+            if (r.status_code == 200):
+                with open(file_path, 'wb') as f:
+                    r.raw.decode_content = True
+                    shutil.copyfileobj(r.raw, f)
+        except Exception as e:
+            time.sleep(1)
+            if no_of_tries == 0:
+                print(f"[WARNING] {image_url} NOT DOWNLOADED -- TRYING AGAIN, {e}")
+                self.__download_image(image_url)
+                no_of_tries += 1 
+            else:
+                print(f"[ERROR] {image_url} WAS NOT DOWNLOADED, {e}")
 
-                    if(temp_pin_urls[x] != None):
-                        for i in temp_pin_urls[x]:
-                            database.set_pin_is_downloaded(i)
-                        temp_pin_urls[x] = None
+    def __get_image_url_from_pin(self, pin_url):
+        no_of_tries = 0 
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT img_url FROM image_url WHERE pin_url=? ",(pin_url,)).fetchone()
+                conn.commit()
+                return cursor[0]
 
-                    temp = []
-                    for c in range(200):
-                        try:
-                            temp.append(pin_urls.pop())
-                            print(count)
-                            count += 1
-                        except:
-                            break
-                    # pin[x].set_is_done(False)
-                    th = multiprocessing.Process(
-                        target=pin[x].scrape_image_url, args=(temp, ))
-                    th.start()
-                    temp_pin_urls[x] = temp
-                    threads.append(th)
-                for a in threads:
-                    a.join()
-
-            for x in range(maximum_scrape_theads):
+        except Exception as e:
+            if no_of_tries == 0 :
+                print(f"[WARNING] TRYING AGAIN -- CANNOT GET IMAGE URL FOR {pin_url}, {e}")
                 time.sleep(1)
+                return self.__get_image_url_from_pin(pin_url)
+            else:
+                print(f"[ERROR] CANNOT GET IMAGE URL FOR {pin_url}, {e}")
 
-                if(temp_pin_urls[x] != None):
-                    for i in temp_pin_urls[x]:
-                        database.set_pin_is_downloaded(i)
-                        
-        print("Downloading images...")
-        i = images()
-        i.download_all_images()
+    def __update_pin(self,pin_url,image_url):
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute("UPDATE image_url SET img_url=? WHERE pin_url=?",(image_url,pin_url))
+                conn.commit()
+                print(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
+        except Exception as e:
+            if "database is locked" in str(e).lower() :
+                time.sleep(1)
+                self.__update_pin(pin_url,image_url)
+            else:
+                print(f"[WARNING] {pin_url} CANNOT BE UPDATED TO DB.")
 
-        r = rar()
-        r.add_to_zip_file()
+    def __insert_into_db(self, pin_url, image_url):
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute("INSERT INTO image_url (pin_url, img_url) values (?,?)",(pin_url,image_url))
+                conn.commit()
+                print(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
+        except Exception as e:
+            if "database is locked" in str(e).lower() :
+                time.sleep(1)
+                self.__insert_into_db(pin_url,image_url)
+            else:
+                print(f"[WARNING] {pin_url} CANNOT BE INSERTED TO DB.")
+ 
+    def __check_existance(self, pin_url, image_url):
+        exist = 0
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT count(*) FROM image_url WHERE pin_url=? AND img_url=?",(pin_url,image_url)).fetchone()
+                conn.commit()
+                exist = cursor[0]
+        except Exception as e :
+            print(f"[ERROR] CANNOT CHECK EXISTANCE OF {pin_url}::{image_url},{e}")
+            time.sleep(1)
+            return self.__check_existance(pin_url)
+        return exist
 
-        # c = chrome()
-        # c.upload_to_mega()
+    def __push_pin_image_url_to_database(self):
+        for pin_url in self.scraped_pin_url:
+            image_url = self.scraped_pin_url[pin_url]
+            if self.__check_existance(pin_url, image_url):
+                print(f"[WARNING] UPDATING {pin_url} IN DB")
+                self.__update_pin(pin_url,image_url)
+            else:
+                self.__insert_into_db(pin_url, image_url)    
+    
+    def __scrape_image_url(self, pin_url):
+        """ getting the image url given pin url """
+        no_of_tries = 0 # may be fail in first time for connection errors
+        try:
+            page = requests.get(pin_url).text
+            soup = BeautifulSoup(page, 'html.parser')
+            image_url = soup.find("img")["src"]
+            return pin_url, image_url
+            #self.__push_pin_image_url_to_database(pin_url,image_url)
 
-class chrome:
-    def initDriver(IS_HEADLESS=False) -> webdriver:
-        options = chrome_options()
-        options.add_experimental_option(
-            "excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument("--disable-blink-features")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.headless = IS_HEADLESS
-        prefs = {
-            "profile.managed_default_content_settings.images": 2
-        }
-        options.add_experimental_option("prefs", prefs)
-        return webdriver.Chrome(service=chrome_service(
-            ChromeDriverManager().install()), options=options)
+        except Exception as e:
+            if(str(e).find("conn") != -1):
+                self.__scrape_image_url(pin_url)
+            if no_of_tries == 0:
+                self.__scrape_image_url(pin_url)
+                no_of_tries += 1
+            print(f"[WARNING] {pin_url} FAILED, {e}")
+            return None , None 
 
-    # def upload_to_mega(self):
-    #     global RAR_PATH
-    #     driver = self.initDriver()
-    #     driver.get(MEGA_FOLDER_LINK)
-    #     try:
-    #         element = WebDriverWait(driver, 60).until(
-    #             EC.presence_of_element_located((By.NAME, "dashboard"))
-    #         )
-    #     except:
-    #         print('Waitting Error!!')
-    #     time.sleep(5)
-    #     number = 0
-    #     r = rar()
-    #     for file in r.get_rar_path():
-    #         random_name = RAR_PATH + '/' + str(database.get_search_term()) + "_" +\
-    #             str(number) + '.rar'
-    #         number += 1
+    def __count_pins_in_board(self,board_url):
+        pins_count = None
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT count(*) as pins_count from stage2 WHERE board_url=?",(board_url,)).fetchall()
+                conn.commit()
+                pins_count = cursor[0][0]
 
-    #         os.rename(file, random_name)
-    #         driver.find_element(By.ID, "fileselect3").send_keys(random_name)
+        except Exception as e :
+            print(f"[ERROR] cannot count pins in stage2 in board {board_url}!, because of {e}")
+            time.sleep(1)
+            return self.__count_pins_in_board(board_url)
+        return pins_count
 
-    #     count = 0
-    #     while(1):
-    #         x = driver.find_elements(
-    #             By.CLASS_NAME, 'transfer-task-row upload sprite-fm-mono icon-up progress')
-    #         y = driver.find_elements(
-    #             By.CLASS_NAME, 'transfer-task-row upload')
+    def __report(self):
+        print("-"*100)
+        for board in self.board_pins_dict:
+            board_name = board.split('/')[-2]
+            board_image_list = os.listdir(os.path.join(self.output_folder, board_name))
+            board_url = f"https://www.pinterest.com{board}"
+            scrapped_pins_count = self.__count_pins_in_board(board_url)
+            print(f"[INFO]  {len(board_image_list)} OUT OF {scrapped_pins_count} IMAGES DOWNLOADED FOR BOARD {board_name}")
+        print("-"*100)
 
-    #         if(len(x) == 0 and len(y) == 0):
-    #             count += 1
-    #         else:
-    #             count = 0
-    #         if(count == 5):
-    #             break
-    #         time.sleep(2)
-    #     input("ENTER WHEN DONE")
-    #     driver.quit()
+    def __count_unique_image_urls(self):
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT COUNT(DISTINCT img_url) as unique_count FROM image_url").fetchone()
+                conn.commit()
+                return cursor[0]
+
+        except Exception as e :
+            print(f"[ERROR] CANNOT COUNT UNIQUE IMAGE URLS")
+            time.sleep(1)
+            return self.__count_unique_image_urls()
+        return exist
+
+    def __create_zip_file(self):
+        shutil.make_archive(os.path.join(self.zip_output_folder,self.folder_name), 'zip', self.output_folder)
+
+    def run(self):
+        # list of all boards urls        
+        board_urls = database.get_board_urls(search_term=self.search_term)
+        for board in board_urls:
+            # get all the pins of a board url from stage2 table 
+            self.board_pins_dict[board] = database.get_pins_for_board(f"https://www.pinterest.com{board}")
+            # looping on every pin url
+            # for pin in self.board_pins_dict[board]:
+            #     print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
+            #     self.__scrape_image_url(pin)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = []
+                for pin in self.board_pins_dict[board]:
+                    print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
+                    a_result = executor.submit(self.__scrape_image_url, pin)
+                    futures.append(a_result)
+        
+                for future in concurrent.futures.as_completed(futures):
+                    pin_url , image_url = future.result()
+                    if pin_url is not None:
+                        self.scraped_pin_url[pin_url] = image_url
+
+        print("[INFO] INSERTING TO DB") 
+        self.__push_pin_image_url_to_database()
+
+        print("[INFO] STARTING DOWNLOADING ...")
+        self.__download_all_images()
+        print("[INFO] DOWNLOAD ENDED")
+
+        print("[INFO] REPORTING")
+        self.__report()
+
+        print("[INFO] CREATING ZIP FILE")
+        self.__create_zip_file()
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 
-#     stage4 = Stage4()     
-#     stage4.run()
+    stage4 = Stage3("kcg-characters")     
+    stage4.run()

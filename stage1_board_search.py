@@ -75,20 +75,20 @@ class Stage1:
 
         for a in links_list:
             url = a["href"]
-            print(url)
+            #print(url)
             image_count = self.__get_image_count(a)
             board_name =  self.__get_board_name(a)
             self.all_data[url] = [self.search_term, image_count, board_name]
         
+        print(len(self.all_data))
+        print(len(links_list))
         return len(links_list)
     
     def __scrape_boards_urls(self):
         self.driver.set_window_size(1280, 720)
-        #self.driver.maximize_window() # For maximizing window
-        #self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
         tag_div = self.driver.find_element(By.XPATH , "//div[@role='list']")
         return self.__get_boards(tag_div.get_attribute('innerHTML'))
-    
+
     def get_board_search_result(self):        
         # make driver settings ready for scrapping.
         self.driver.delete_all_cookies()
@@ -169,8 +169,9 @@ class Stage1:
         self.__start_connections()     
         self.get_board_search_result()
 
+        print(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
         for url in self.all_data:
-            self.__push_into_db(str(url), int(self.all_data[url][1])) 
+            self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",",""))) 
 
         self.__exit_stage()
 
