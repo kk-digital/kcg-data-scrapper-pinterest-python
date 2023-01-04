@@ -126,7 +126,7 @@ class Stage1:
         except Exception as e :
             print(f"[ERROR] cannot check board existance , because of {e}")
             time.sleep(1)
-            return self.__check_existance(board_url, self.search_term)
+            return self.__check_existance(board_url)
         return exist
 
     def __push_into_db(self, board_url, images_count):

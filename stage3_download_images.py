@@ -37,9 +37,12 @@ class Stage3:
         self.folder_name = f"images-{folder_index:04n}"
         self.output_folder = os.path.join(self.parent_directory,self.folder_name)
         os.makedirs(self.output_folder, exist_ok=True)
+        
+        # some reporting variables 
         self.duplicated_images = 0          # number of images refused by duplication  
         self.downloaded_success_images = {} # 'board' : number of succesfully downloaded images 
-        self.unique_files = []
+        self.unique_files = {} # 'board':[List of unique files]
+
     def __next_dataset_index(self):
         """ Getting the index of the new dataset """
         try:
@@ -54,9 +57,7 @@ class Stage3:
                         indices.append(max(indices)+1)
                     except ValueError: # indices list is empty 
                         indices.append(1)
-
             return max(indices) + 1
-        
         except ValueError:
             return 1    
         
@@ -65,7 +66,9 @@ class Stage3:
             board_name = board.split('/')[-2]
             print(f"[INFO] DOWNLOADING BOARD {board_name}")
             os.makedirs(os.path.join(self.output_folder,board_name),exist_ok=True)               
-            self.downloaded_success_images[board] = 0  
+            self.downloaded_success_images[board] = 0 
+            self.unique_files[board_name] = [] 
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for pin in self.board_pins_dict[board]:
@@ -89,10 +92,12 @@ class Stage3:
     def __download_image(self,board_name,image_url):
         file_path = os.path.join(self.output_folder,board_name,image_url.replace(":", "_").replace("/", "_"))
         
-        if(os.path.exists(file_path)):
-            print(f"[INFO] {image_url} ALREADY EXISTS")
+        # check if the file exists in the folder or not 
+        if file_path not in self.unique_files[board_name]:
+            self.unique_files[board_name].append(file_path)
+        else:
             self.duplicated_images += 1
-            return None
+            return
 
         print(f"[INFO] DOWNLOADING: {image_url} ")
         no_of_tries = 0 
@@ -103,9 +108,6 @@ class Stage3:
                     r.raw.decode_content = True
                     shutil.copyfileobj(r.raw, f)
                 f.close()
-            
-            if file_path not in self.unique_files:
-                self.unique_files.append(file_path)
 
             return image_url
         except Exception as e:
@@ -253,8 +255,10 @@ class Stage3:
         print(f"[INFO] NUMBER OF SUCCESSFULLY SCRAPPED PINS: {len(self.scraped_pin_url)}")
         for board in self.downloaded_success_images:
             print(f"[INFO] BOARD: {board}, DOWNLOADED : {self.downloaded_success_images[board]}")
-        print(f"[INFO] UNIQUE FILE NAMES = {len(self.unique_files)}")
         
+        for board_name in self.unique_files:
+            print(f"[INFO] BOARD: {board_name}  HAS {len(self.unique_files[board_name])} UNIQUE FILE")
+
         for board in self.board_pins_dict:
             board_name = board.split('/')[-2]
             board_image_list = os.listdir(os.path.join(self.output_folder, board_name))
@@ -262,7 +266,7 @@ class Stage3:
             scrapped_pins_count = self.__count_pins_in_board(board_url)
             print(f"[INFO]  {len(board_image_list)} OUT OF {scrapped_pins_count} IMAGES DOWNLOADED FOR BOARD {board_name}")
         
-        print(f"[INFO] NUMBER OF DUPLICATED IMAGES {self.duplicated_images}")
+        print(f"[INFO] NUMBER OF DUPLICATED IMAGES IN ALL BOARDS: {self.duplicated_images}")
         print("-"*100)
 
     def __count_unique_image_urls(self):
