@@ -28,6 +28,7 @@ class Stage3:
         self.max_workers = max_workers
         self.search_term = search_term 
         self.board_pins_dict = {}
+        self.board_scrapped_pin_count = {} # board-name: number of scrapped pins
         self.scraped_pin_url = {}
         self.parent_directory  = os.path.join('outputs','datasets')
         self.zip_output_folder = os.path.join('outputs','dataset-zip-files')
@@ -65,9 +66,10 @@ class Stage3:
         for board in self.board_pins_dict:
             board_name = board.split('/')[-2]
             print(f"[INFO] DOWNLOADING BOARD {board_name}")
-            os.makedirs(os.path.join(self.output_folder,board_name),exist_ok=True)               
+            board_folder = "_".join([elem for elem in board.split("/") if elem != ''])
+            os.makedirs(os.path.join(self.output_folder,board_folder),exist_ok=True)               
             self.downloaded_success_images[board] = 0 
-            self.unique_files[board_name] = [] 
+            self.unique_files[board_folder] = [] 
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
@@ -81,7 +83,7 @@ class Stage3:
 
                     if image_url is None:
                         continue
-                    a_result = executor.submit(self.__download_image, board_name,image_url)
+                    a_result = executor.submit(self.__download_image, board_folder,image_url)
                     futures.append(a_result)
         
                 for future in concurrent.futures.as_completed(futures):
@@ -89,12 +91,12 @@ class Stage3:
                     if success_url is not None:
                         self.downloaded_success_images[board] += 1
                         
-    def __download_image(self,board_name,image_url):
-        file_path = os.path.join(self.output_folder,board_name,image_url.replace(":", "_").replace("/", "_"))
+    def __download_image(self,board_folder,image_url):
+        file_path = os.path.join(self.output_folder,board_folder,image_url.replace(":", "_").replace("/", "_"))
         
         # check if the file exists in the folder or not 
-        if file_path not in self.unique_files[board_name]:
-            self.unique_files[board_name].append(file_path)
+        if file_path not in self.unique_files[board_folder]:
+            self.unique_files[board_folder].append(file_path)
         else:
             self.duplicated_images += 1
             return
@@ -114,7 +116,7 @@ class Stage3:
             time.sleep(1)
             if no_of_tries == 0:
                 print(f"[WARNING] {image_url} NOT DOWNLOADED -- TRYING AGAIN, {e}")
-                self.__download_image(board_name,image_url)
+                self.__download_image(board_folder,image_url)
                 no_of_tries += 1 
             else:
                 print(f"[ERROR] {image_url} WAS NOT DOWNLOADED, {e}")
@@ -151,6 +153,21 @@ class Stage3:
             time.sleep(1)
             return self.__get_pins_for_board(board_url)
         return returns
+
+    def __get_true_pins_count(self,board):
+        true_pins_count = None
+        try:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.execute("SELECT pin_count FROM stage1 WHERE board_url=?",(board,)).fetchone()
+                conn.commit()
+                true_pins_count = cursor[0]
+
+        except Exception as e :
+            print(f"[ERROR] cannot get true pins count!, because of {e}")
+            time.sleep(1)
+            return self.__get_true_pins_count(board)
+        return true_pins_count
+
 
     def __get_board_urls(self):
         """returns a list of boards urls from stage1 table using the search term """
@@ -252,21 +269,24 @@ class Stage3:
 
     def __report(self):
         print("-"*100)
-        print(f"[INFO] NUMBER OF SUCCESSFULLY SCRAPPED PINS: {len(self.scraped_pin_url)}")
-        for board in self.downloaded_success_images:
-            print(f"[INFO] BOARD: {board}, DOWNLOADED : {self.downloaded_success_images[board]}")
-        
-        for board_name in self.unique_files:
-            print(f"[INFO] BOARD: {board_name}  HAS {len(self.unique_files[board_name])} UNIQUE FILE")
-
         for board in self.board_pins_dict:
-            board_name = board.split('/')[-2]
-            board_image_list = os.listdir(os.path.join(self.output_folder, board_name))
-            board_url = f"https://www.pinterest.com{board}"
-            scrapped_pins_count = self.__count_pins_in_board(board_url)
-            print(f"[INFO]  {len(board_image_list)} OUT OF {scrapped_pins_count} IMAGES DOWNLOADED FOR BOARD {board_name}")
+            #board_url = f"https://www.pinterest.com{board}"
+            board_folder = "_".join([elem for elem in board.split("/") if elem != ''])
+            print(f"[INFO] BOARD: {board}")
+            print(f"-------> TARGET: {self.__get_true_pins_count(board)}")
+            print(f"-------> SCRAPPED: {self.board_scrapped_pin_count[board]}")
+            print(f"-------> UNIQUE: {len(self.unique_files[board_folder])}")
+            print(f"-------> DOWNLOADED: {self.downloaded_success_images[board]}")
+            print("-"*50)
+            
+        # for board in self.board_pins_dict:
+        #     board_name = board.split('/')[-2]
+        #     board_image_list = os.listdir(os.path.join(self.output_folder, board_name))
+        #     board_url = f"https://www.pinterest.com{board}"
+        #     scrapped_pins_count = self.__count_pins_in_board(board_url)
+        #     print(f"[INFO]  {len(board_image_list)} OUT OF {scrapped_pins_count} IMAGES DOWNLOADED FOR BOARD {board_name}")
         
-        print(f"[INFO] NUMBER OF DUPLICATED IMAGES IN ALL BOARDS: {self.duplicated_images}")
+        # print(f"[INFO] NUMBER OF DUPLICATED IMAGES IN ALL BOARDS: {self.duplicated_images}")
         print("-"*100)
 
     def __count_unique_image_urls(self):
@@ -290,6 +310,7 @@ class Stage3:
         for board in board_urls:
             # get all the pins of a board url from stage2 table 
             self.board_pins_dict[board] = self.__get_pins_for_board(f"https://www.pinterest.com{board}")
+            self.board_scrapped_pin_count[board] = 0 
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for pin in self.board_pins_dict[board]:
@@ -302,6 +323,8 @@ class Stage3:
                     
                     if pin_url is not None:
                         self.scraped_pin_url[pin_url] = image_url
+                        self.board_scrapped_pin_count[board] += 1 
+                        
                     
         print("[INFO] INSERTING TO DB") 
         self.__push_pin_image_url_to_database()
