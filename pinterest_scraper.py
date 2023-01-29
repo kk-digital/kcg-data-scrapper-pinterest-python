@@ -8,7 +8,7 @@ import os
 def pintrest_scraper_cli(
                             search_term: str = None,
                             stages_to_execute: List[int] = [1, 2, 3, 4],
-                            maximum_scrape_theads: int = 2
+                            maximum_scrape_theads: int = 10
                             ) -> None: 
     """Executes the chosen stages of the pintrest scraping, it raises error if stage 1 was chosen to be executed and `search_term` was not 
         a valid string.
@@ -30,20 +30,14 @@ def pintrest_scraper_cli(
     stages = {} 
     stages[1] = Stage1(search_term)        
     stages[2] = Stage2(search_term)        
-    stages[3] = Stage3(search_term)        
+    stages[3] = Stage3(search_term, maximum_scrape_theads)        
     
-    for stage_no in range(1, 5):
+    for stage_no in range(1, 4):
 
         if stage_no in stages_to_execute: 
             
             print(f"[INFO] starting stage {stage_no}")
-            
-            if stage_no == 1: 
-                stages[stage_no].run()
-            elif stage_no == 4: 
-                stages[stage_no].run(maximum_scrape_theads)
-            else: 
-                stages[stage_no].run()
+            stages[stage_no].run()
             
     return 
 

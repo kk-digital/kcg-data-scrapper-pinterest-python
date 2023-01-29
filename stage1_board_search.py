@@ -80,8 +80,8 @@ class Stage1:
             board_name =  self.__get_board_name(a)
             self.all_data[url] = [self.search_term, image_count, board_name]
         
-        print(len(self.all_data))
-        print(len(links_list))
+        # print(len(self.all_data))
+        # print(len(links_list))
         return len(links_list)
     
     def __scrape_boards_urls(self):
