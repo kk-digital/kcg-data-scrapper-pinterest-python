@@ -22,6 +22,7 @@ file_out_path = os.path.join(out_folder, 'output_of_second_tool.json')
 Separator_for_csv = "\t"
 DATABASE_PATH = "database.db"
 HOW_MANY_WINDOWS_DO_YOU_NEED = 1
+true_pin_count = None # true number of pins for a single board
 
 
 class window:
@@ -83,10 +84,13 @@ class window:
         #print(f"[INFO] THE CURRENT PAGE WINDOW IN IS {get_url}")
         self.driver.implicitly_wait(20) # gives an implicit wait for 20 seconds
         
+        
         try: 
-            mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@class='gridCentered']")        
-        except Exception:
-            mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@role='main']")
+            mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@class='gridCentered']")                
+        except Exception as e :
+            #mother_of_a_tag = self.driver.find_element(By.XPATH, "//div[@role='main']")
+            print(f"[ERROR] IN SEARCHING FOR XPATH, {e}")
+            return
 
         mother_of_a_tag = mother_of_a_tag.get_attribute('innerHTML')
         soup = BeautifulSoup(mother_of_a_tag, 'html.parser')
@@ -116,10 +120,10 @@ class window:
 
     def push_to_database(self, pin_url):
         if self.exist_in_db(pin_url):
-            print(f"[INFO] {pin_url} with {self.board_url} exists.")
+            #print(f"[INFO] {pin_url} with {self.board_url} exists.")
             return 
         else:
-            print(f"[INFO] inserting {pin_url} with {self.board_url}.")
+            #print(f"[INFO] inserting {pin_url} with {self.board_url}.")
             self.insert_to_database(pin_url)
 
     def insert_to_database(self, pin_url):
@@ -140,24 +144,50 @@ class window:
                 print(str(e))
 
 
+def get_true_pins_count(board):
+    true_pins_count = None
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.execute("SELECT pin_count FROM stage1 WHERE board_url=?",(board,)).fetchone()
+            conn.commit()
+            true_pins_count = cursor[0]
+
+    except Exception as e :
+        print(f"[ERROR] cannot get true pins count!, because of {e}")
+        time.sleep(1)
+        return get_true_pins_count(board)
+    return true_pins_count
+
+
 def process(board_list):
     driver = init_driver()
     driver.set_window_size(1280,720)
     windows = [window(driver, i) for i in driver.window_handles]
     
-    for index , board in enumerate(board_list):
+    for index in range(len(board_list)):
+        board = board_list[index]
+        true_pin_count =  get_true_pins_count(board)
         board_url = f"https://www.pinterest.com{board}"
         windows[0].load_board_page(board_url)
         windows[0].get_link_pin()
+        print(f"[INFO] STARTING PINS SCRAPING FOR BOARD {board}")
 
         first_roll = True
-        while(windows[0].is_loaded_full_images(first_roll)): # waiting for the page to scroll and then collect pins
-            windows[0].get_link_pin()
-            links_count = len(windows[0].all_links)
-            print(f"[INFO] {links_count} pins scrapped in board {board_url}")
-            first_roll = False
+        try:
+            while(windows[0].is_loaded_full_images(first_roll)): # waiting for the page to scroll and then collect pins
+                try:
+                    windows[0].get_link_pin()
+                    links_count = len(windows[0].all_links)
+                    print(f"[INFO] {links_count} pins scrapped out of {true_pin_count} in board {board_url}")
+                    first_roll = False
+                    windows[0].is_loaded_full_images(first_roll)
+                except Exception as e:
+                    print(f"[ERROR] IN PAGE LOOP, {e}")
+        except Exception as e:
+            print("[ERROR] BEFORE GOING TO THE PAGE LOOP, {e}")
+            index -= 1
         #set_board_is_scraped(board_url)
-        print(f"[INFO] FINISHED URL:{board_url}; PINS = {links_count}")
+        print(f"[INFO] FINISHED URL:{board_url}; PINS = {links_count}; TRUE NUMBER = {true_pin_count}")
 
 def count_pins_in_board(board_url):
     pins_count = None

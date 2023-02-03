@@ -73,7 +73,7 @@ class Stage3:
                     try:
                         image_url = self.scraped_pin_url[pin]
                     except KeyError:
-                        print(f"[WARNING] PIN {pin} WAS MISSED")
+                        #print(f"[WARNING] PIN {pin} WAS MISSED")
                         continue
 
                     if image_url is None:
@@ -95,7 +95,7 @@ class Stage3:
         else:
             return
 
-        print(f"[INFO] DOWNLOADING: {image_url} ")
+        #print(f"[INFO] DOWNLOADING: {image_url} ")
         no_of_tries = 0 
         try:
             r = requests.get(image_url, stream=True, timeout=60)
@@ -183,7 +183,7 @@ class Stage3:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute("UPDATE image_url SET img_url=? WHERE pin_url=?",(image_url,pin_url))
                 conn.commit()
-                print(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
+                #print(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
         except Exception as e:
             if "database is locked" in str(e).lower() :
                 time.sleep(1)
@@ -196,7 +196,7 @@ class Stage3:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute("INSERT INTO image_url (pin_url, img_url) values (?,?)",(pin_url,image_url))
                 conn.commit()
-                print(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
+                #print(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
         except Exception as e:
             if "database is locked" in str(e).lower() :
                 time.sleep(1)
@@ -221,7 +221,7 @@ class Stage3:
         for pin_url in self.scraped_pin_url:
             image_url = self.scraped_pin_url[pin_url]
             if self.__check_existance(pin_url, image_url):
-                print(f"[WARNING] UPDATING {pin_url} IN DB")
+                #print(f"[WARNING] UPDATING {pin_url} IN DB")
                 self.__update_pin(pin_url,image_url)
             else:
                 self.__insert_into_db(pin_url, image_url)    
@@ -295,10 +295,11 @@ class Stage3:
             # get all the pins of a board url from stage2 table 
             self.board_pins_dict[board] = self.__get_pins_for_board(f"https://www.pinterest.com{board}")
             self.report_dict[board] = {'scrapped_pin_count':0, 'download_success_images':0}
+            print(f"[INFO] FINDING IMAGE URLS FOR PIN OF BOARD: {board}")
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for pin in self.board_pins_dict[board]:
-                    print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
+                    #print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
                     a_result = executor.submit(self.__scrape_image_url, pin)
                     futures.append(a_result)
         
