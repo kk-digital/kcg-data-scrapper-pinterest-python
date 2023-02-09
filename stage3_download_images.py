@@ -307,19 +307,26 @@ class Stage3:
             self.board_pins_dict[board] = self.__get_pins_for_board(f"https://www.pinterest.com{board}")
             self.report_dict[board] = {'scrapped_pin_count':0, 'download_success_images':0}
             print(f"[INFO] FINDING IMAGE URLS FOR PIN OF BOARD: {board}")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = []
-                for pin in self.board_pins_dict[board]:
-                    #print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
-                    a_result = executor.submit(self.__scrape_image_url, pin)
-                    futures.append(a_result)
+            # with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            #     futures = []
+            #     for pin in self.board_pins_dict[board]:
+            #         #print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
+            #         a_result = executor.submit(self.__scrape_image_url, pin)
+            #         futures.append(a_result)
         
-                for future in concurrent.futures.as_completed(futures):
-                    pin_url , image_url = future.result()
+            #     for future in concurrent.futures.as_completed(futures):
+            #         pin_url , image_url = future.result()
                     
-                    if pin_url is not None:
-                        self.scraped_pin_url[pin_url] = image_url
-                        self.report_dict[board]['scrapped_pin_count'] += 1 
+            #         if pin_url is not None:
+            #             self.scraped_pin_url[pin_url] = image_url
+            #             self.report_dict[board]['scrapped_pin_count'] += 1 
+            for pin in self.board_pins_dict[board]:
+                #print(f"[INFO] FINDING IMAGE URL FOR PIN: {pin}")
+                pin_url , image_url = self.__scrape_image_url(pin)
+                
+                if pin_url is not None:
+                    self.scraped_pin_url[pin_url] = image_url
+                    self.report_dict[board]['scrapped_pin_count'] += 1 
                         
                     
         # print("[INFO] INSERTING TO DB") 
