@@ -77,25 +77,41 @@ class Stage3:
             os.makedirs(os.path.join(self.output_folder,board_folder),exist_ok=True)               
             self.unique_files[board_folder] = [] 
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = []
-                for pin in self.board_pins_dict[board]:
+            # with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            #     futures = []
+            #     for pin in self.board_pins_dict[board]:
                     
-                    try:
-                        image_url = self.scraped_pin_url[pin]
-                    except KeyError:
-                        #print(f"[WARNING] PIN {pin} WAS MISSED")
-                        continue
+            #         try:
+            #             image_url = self.scraped_pin_url[pin]
+            #         except KeyError:
+            #             #print(f"[WARNING] PIN {pin} WAS MISSED")
+            #             continue
 
-                    if image_url is None:
-                        continue
-                    a_result = executor.submit(self.__download_image, board_folder,image_url)
-                    futures.append(a_result)
+            #         if image_url is None:
+            #             continue
+            #         a_result = executor.submit(self.__download_image, board_folder,image_url)
+            #         futures.append(a_result)
         
-                for future in concurrent.futures.as_completed(futures):
-                    success_url = future.result()
-                    if success_url is not None:
-                        self.report_dict[board]['download_success_images'] += 1
+            #     for future in concurrent.futures.as_completed(futures):
+            #         success_url = future.result()
+            #         if success_url is not None:
+            #             self.report_dict[board]['download_success_images'] += 1
+    
+            for pin in self.board_pins_dict[board]:
+                
+                try:
+                    image_url = self.scraped_pin_url[pin]
+                except KeyError:
+                    #print(f"[WARNING] PIN {pin} WAS MISSED")
+                    continue
+
+                if image_url is None:
+                    continue
+    
+                success_url = self.__download_image(board_folder,image_url)
+                if success_url is not None:
+                    self.report_dict[board]['download_success_images'] += 1
+                
                         
     def __download_image(self,board_folder,image_url):
         file_path = os.path.join(self.output_folder,board_folder,image_url.replace(":", "_").replace("/", "_"))
