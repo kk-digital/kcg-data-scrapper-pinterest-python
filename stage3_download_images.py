@@ -39,7 +39,7 @@ class Stage3:
         self.output_folder = os.path.join(self.parent_directory,self.folder_name)
         os.makedirs(self.output_folder, exist_ok=True)
         self.unique_files = {} # 'board':[List of unique files]
-
+        self.db_conn  = None
         self.db_conn  = self.__initiate_db_conn() 
 
 
