@@ -322,8 +322,8 @@ class Stage3:
                         self.report_dict[board]['scrapped_pin_count'] += 1 
                         
                     
-        print("[INFO] INSERTING TO DB") 
-        self.__push_pin_image_url_to_database()
+        # print("[INFO] INSERTING TO DB") 
+        # self.__push_pin_image_url_to_database()
 
         print("[INFO] STARTING DOWNLOADING ...")
         self.__download_all_images()
