@@ -49,7 +49,7 @@ class Stage3:
             print(f"[ERROR] no db")       
             return SyntaxError     
 
-        return self.db_conn
+        return sqlite3.connect(DATABASE_PATH)
 
     def __next_dataset_index(self):
         """ Getting the index of the new dataset """
