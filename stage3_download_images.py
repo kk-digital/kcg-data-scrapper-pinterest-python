@@ -40,6 +40,17 @@ class Stage3:
         os.makedirs(self.output_folder, exist_ok=True)
         self.unique_files = {} # 'board':[List of unique files]
 
+        self.db_conn  = self.__initiate_db_conn() 
+
+
+    def __initiate_db_conn(self):
+        """ getting the connection object to the DB""" 
+        if not os.path.exists(DATABASE_PATH):
+            print(f"[ERROR] no db")       
+            return SyntaxError     
+
+        return self.db_conn
+
     def __next_dataset_index(self):
         """ Getting the index of the new dataset """
         try:
@@ -120,7 +131,7 @@ class Stage3:
     def __get_image_url_from_pin(self, pin_url):
         no_of_tries = 0 
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT img_url FROM image_url WHERE pin_url=? ",(pin_url,)).fetchone()
                 conn.commit()
                 return cursor[0]
@@ -136,7 +147,7 @@ class Stage3:
     def __get_pins_for_board(self,board_url):
         returns= []
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT pin_url from stage2 WHERE board_url=?",(board_url,)).fetchall()
                 conn.commit()
                 for i in cursor:
@@ -151,7 +162,7 @@ class Stage3:
     def __get_true_pins_count(self,board):
         true_pins_count = None
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT pin_count FROM stage1 WHERE board_url=?",(board,)).fetchone()
                 conn.commit()
                 true_pins_count = cursor[0]
@@ -166,7 +177,7 @@ class Stage3:
         """returns a list of boards urls from stage1 table using the search term """
         returns = []
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT board_url from stage1 WHERE search_term=?",(self.search_term,))
                 conn.commit()
                 for i in cursor:
@@ -180,7 +191,7 @@ class Stage3:
 
     def __update_pin(self,pin_url,image_url):
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 conn.execute("UPDATE image_url SET img_url=? WHERE pin_url=?",(image_url,pin_url))
                 conn.commit()
                 #print(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
@@ -193,7 +204,7 @@ class Stage3:
 
     def __insert_into_db(self, pin_url, image_url):
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 conn.execute("INSERT INTO image_url (pin_url, img_url) values (?,?)",(pin_url,image_url))
                 conn.commit()
                 #print(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
@@ -207,7 +218,7 @@ class Stage3:
     def __check_existance(self, pin_url, image_url):
         exist = 0
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT count(*) FROM image_url WHERE pin_url=? AND img_url=?",(pin_url,image_url)).fetchone()
                 conn.commit()
                 exist = cursor[0]
@@ -249,7 +260,7 @@ class Stage3:
     def __count_pins_in_board(self,board_url):
         pins_count = None
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT count(*) as pins_count from stage2 WHERE board_url=?",(board_url,)).fetchall()
                 conn.commit()
                 pins_count = cursor[0][0]
@@ -275,7 +286,7 @@ class Stage3:
 
     def __count_unique_image_urls(self):
         try:
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with self.db_conn as conn:
                 cursor = conn.execute("SELECT COUNT(DISTINCT img_url) as unique_count FROM image_url").fetchone()
                 conn.commit()
                 return cursor[0]
