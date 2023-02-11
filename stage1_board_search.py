@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from helper_functions import init_driver , create_database, page_has_loaded
 import time 
-
+import re
 
 class Stage1:
     """ Stage1: getting all boards urls for a given search term"""
@@ -15,7 +15,7 @@ class Stage1:
         self.all_data = {}
         self.driver = None
         self.db_conn = None
-    
+
     def __start_connections(self):
         self.db_conn  = self.__initiate_db_conn() 
         self.driver = init_driver()
@@ -44,6 +44,22 @@ class Stage1:
                         continue
         return -1
     
+    def __extract_sections(self,input_string):
+        # Use a regular expression to search for the number of sections
+        pattern = re.compile(r'(\d+)\ssection')
+        match = pattern.search(input_string)
+        return int(match.group(1).replace(',',''))
+         
+
+    def __get_sections_count(self, soup_a):
+        for div in soup_a.find_all("div"):
+            try:
+                if div["style"] == '-webkit-line-clamp: 1;' and 'section' in div.text :
+                    return self.__extract_sections(div.text)
+            except Exception as e:
+                pass
+        return 0
+
     def __get_image_count(self,soup_a):
         """ getting the number of images in a certain board"""
         re = ''
@@ -58,19 +74,18 @@ class Stage1:
             return re
         return re[self.__find_comma(re)+1:re.find("Pins")]
 
+
     def __get_board_name(self,soup_a):
         for i in soup_a.find_all("div"):
-            
             try:
                 if(i['title'] != ''):
                     return i.text
-
             except Exception as e:
                 continue
 
     def __get_boards(self, html):
-        
         soup = BeautifulSoup(html, 'html.parser')
+        self.__get_sections_count(soup)
         links_list = soup.find_all("a")
 
         for a in links_list:
@@ -78,10 +93,9 @@ class Stage1:
             #print(url)
             image_count = self.__get_image_count(a)
             board_name =  self.__get_board_name(a)
-            self.all_data[url] = [self.search_term, image_count, board_name]
+            sections_count = self.__get_sections_count(a)
+            self.all_data[url] = [self.search_term, image_count, sections_count,board_name]
         
-        # print(len(self.all_data))
-        # print(len(links_list))
         return len(links_list)
     
     def __scrape_boards_urls(self):
@@ -129,32 +143,31 @@ class Stage1:
             return self.__check_existance(board_url)
         return exist
 
-    def __push_into_db(self, board_url, images_count):
+    def __push_into_db(self, board_url, images_count, sections_count):
         if self.__check_existance(board_url):
             print(f"[INFO] {board_url} with {self.search_term} exists, updating it.")
-            self.__update_data_in_db(board_url, images_count)
+            self.__update_data_in_db(board_url, images_count, sections_count)
         else:
             print(f"[INFO] inserting {board_url}.")
-            self.__insert_data_into_database(board_url, images_count)
+            self.__insert_data_into_database(board_url, images_count, sections_count)
 
-    def __update_data_in_db(self,board_url, images_count):
+    def __update_data_in_db(self,board_url, images_count, sections_count):
         try:
-            self.db_conn.execute("UPDATE stage1 SET pin_count = ? WHERE board_url = ? and search_term=?;",(images_count, board_url,self.search_term.replace("'", "''")))
-            self.db_conn.commit()
-        
+            self.db_conn.execute("UPDATE stage1 SET pin_count = ?, sections_count=? WHERE board_url = ? and search_term=?;",(images_count,sections_count,board_url,self.search_term.replace("'", "''")))
+            self.db_conn.commit()        
         except Exception as e:
             print(f"[INFO] ERROR {e} in board {board_url}")
  
 
-    def __insert_data_into_database(self, board_url, images_count):
+    def __insert_data_into_database(self, board_url, images_count, sections_count):
         try:
-            self.db_conn.execute("""INSERT INTO stage1(search_term, board_url, pin_count) VALUES (?,?,?)""",
-                            (self.search_term.replace("'", "''"), board_url, images_count),)
+            self.db_conn.execute("""INSERT INTO stage1(search_term, board_url, pin_count, sections_count) VALUES (?,?,?,?)""",
+                            (self.search_term.replace("'", "''"), board_url, images_count, sections_count),)
             self.db_conn.commit()
         
         except sqlite3.IntegrityError:
             print(f"[INFO] updating board : {board_url} in DB")
-            self.db_conn.execute("UPDATE stage1 SET search_term = ?, pin_count = ? WHERE board_url = ?;",(self.search_term.replace("'", "''"), images_count, board_url))
+            self.db_conn.execute("UPDATE stage1 SET search_term = ?, pin_count = ?, sections_count=? WHERE board_url = ?;",(self.search_term.replace("'", "''"), images_count, sections_count,board_url))
             self.db_conn.commit()
         
         except Exception as e:
@@ -171,7 +184,7 @@ class Stage1:
 
         print(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
         for url in self.all_data:
-            self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",",""))) 
+            self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",","")),self.all_data[url][2])
 
         self.__exit_stage()
 

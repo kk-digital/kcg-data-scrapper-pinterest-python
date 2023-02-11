@@ -35,7 +35,8 @@ def create_database():
     cmd1 = '''CREATE TABLE stage1 (
     search_term TEXT    NOT NULL,
     board_url   TEXT    NOT NULL,
-    pin_count INTEGER DEFAULT (0)
+    pin_count INTEGER DEFAULT (0),
+    sections_count INTEGER DEFAULT (0)
     );
     '''
     # # stage 1 table structure 
