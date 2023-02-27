@@ -7,6 +7,7 @@ import sqlite3
 import os 
 import time
 from selenium.webdriver.common.by import By
+import requests
 
 
 def init_driver():
@@ -28,9 +29,18 @@ def init_driver():
         ChromeDriverManager().install()), options=options)
 
 
+def save_html_page(url, filename):
+    """Save html page to html erros folders"""
+    
+    folder_name = 'html_errors'
+    os.makedirs(folder_name, exist_ok=True)
+    
+    response = requests.get(url)
+    with open(os.path.join(folder_name, filename), 'w') as file:
+        file.write(response.text)
+
 def create_database():
     """Creates the DB"""
-
     # stage 1 table structure 
     cmd1 = '''CREATE TABLE stage1 (
     search_term TEXT    NOT NULL,

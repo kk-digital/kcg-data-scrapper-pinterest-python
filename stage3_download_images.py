@@ -20,6 +20,8 @@ from zipfile import ZipFile
 import glob
 from bs4 import BeautifulSoup
 import concurrent.futures
+from helper_functions import save_html_page
+
 
 DATABASE_PATH = 'database.db'
 
@@ -244,7 +246,10 @@ class Stage3:
                 no_of_tries += 1
                 self.__scrape_image_url(pin_url)
             print(f"[WARNING] {pin_url} FAILED, {e}")
-            return None , None 
+            save_html_page(pin_url, f"{pin_url}_stage3_error.html")
+            print(f"[ERROR] CHECK HTML PAGE: {pin_url}_stage2_error.html")
+
+            return None, None 
 
     def __count_pins_in_board(self,board_url):
         pins_count = None
