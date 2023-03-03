@@ -24,6 +24,7 @@ class Stage2:
         self.search_term = search_term
         self.db_conn = None
         self.all_links = []
+        self.scrapped_boards_count = 0 
 
     def __start_connections(self):
         self.db_conn  = self.__initiate_db_conn() 
@@ -214,6 +215,7 @@ class Stage2:
 
                 print(f"[INFO]{board} :: NUMBER OF PINS SCRAPPED: {len(self.all_links)} PINS OUT OF {target_number_of_pins}")
                 print(f"[INFO]{board} :: SCROLLING")           
+                print(f"[INFO] NUMBER OF BOARDS SCRAPPED {self.scrapped_boards_count}")
                 self.__scroll_inner_height()
                 time.sleep(SCROLL_IDLE_TIME)
                 # Scrapping the pins.
@@ -285,17 +287,19 @@ class Stage2:
             return 
         # Starting DB connections and driver.
         self.__start_connections()
+        
         for board in board_list:
             self.board_url = f"https://www.pinterest.com{board}"
             print(f"[INFO] IN BOARD: {board}")
             # Check if board already scrapped
             if 0.95*self.__get_true_pins_count(board) <= self.__count_pins_in_board():
                 print(f"[INFO] BOARD {board} ALREADY SCRAPPED")
+                self.scrapped_boards_count += 1
                 continue
             
             self.__scroll_and_scrape(board)
             print(f"[INFO] BOARD {board} ; SCRAPPED {len(self.all_links)} ; TARGET {self.__get_true_pins_count(board)}")
-
+            self.scrapped_boards_count += 1
         self.driver.close()
             
         return 
