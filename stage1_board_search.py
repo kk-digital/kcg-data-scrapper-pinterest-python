@@ -298,3 +298,17 @@ class Stage1:
 
         self.__exit_stage()
 
+    def run(self):
+        """main function of the program"""   
+        self.__start_connections()     
+        self.__scroll_and_scrape()
+        self.driver.close()
+
+        print(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
+        for url in self.all_data:
+            try:
+                print(f"[INFO] IN URL {url}")
+                self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",","")),self.all_data[url][2])
+            except Exception as e:
+                print(f"[WARNING] ERROR IN {url}; {e}")
+        self.__exit_stage()
