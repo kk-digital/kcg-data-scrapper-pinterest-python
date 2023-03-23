@@ -3,10 +3,16 @@ import sqlite3
 from consts import DATABASE_PATH
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
-from helper_functions import init_driver , create_database, page_has_loaded
+from helper_functions import init_driver, create_database, save_html_page 
 import time 
 import re
 import socket
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+
 
 SCROLL_IDLE_TIME = 3
 POLL_TIME = 1
@@ -61,7 +67,6 @@ class Stage1:
         match = pattern.search(input_string)
         return int(match.group(1).replace(',',''))
          
-
     def __get_sections_count(self, soup_a):
         for div in soup_a.find_all("div"):
             try:
@@ -85,7 +90,6 @@ class Stage1:
             return re
         return re[self.__find_comma(re)+1:re.find("Pins")]
 
-
     def __get_board_name(self,soup_a):
         for i in soup_a.find_all("div"):
             try:
@@ -106,16 +110,17 @@ class Stage1:
             sections_count = self.__get_sections_count(a)
             self.all_data[url] = [self.search_term, image_count, sections_count,board_name]
         
-    
     def __scrape_boards_urls(self):
-        # self.driver.set_window_size(1280, 720)
-        tag_div = self.driver.find_element(By.XPATH , "//div[@role='list']")
-        return self.__get_boards(tag_div.get_attribute('innerHTML'))
-
-
+        try:
+            tag_div = self.driver.find_element(By.XPATH , "//div[@role='list']")
+            return self.__get_boards(tag_div.get_attribute('innerHTML'))
+        except Exception as e:
+            print(f"[ERROR] IN GETTING LIST HTML ELEMENT; {e}")
+            save_html_page(self.search_term_url, f"{self.search_term}_stage1_error.html")
+            print(f"[ERROR] CHECK HTML PAGE: {self.search_term}_stage1_error.html")
+            
     def __get_scroll_height(self):
         return self.driver.execute_script("return document.documentElement.scrollHeight")
-
 
     def __check_existance(self, board_url):
         """checking if a board url + search term is in DB or not"""
@@ -147,7 +152,6 @@ class Stage1:
         except Exception as e:
             print(f"[INFO] ERROR {e} in board {board_url}")
  
-
     def __insert_data_into_database(self, board_url, images_count, sections_count):
         try:
             self.db_conn.execute("""INSERT INTO stage1(search_term, board_url, pin_count, sections_count) VALUES (?,?,?,?)""",
@@ -169,7 +173,6 @@ class Stage1:
     def __get_scroll_height(self):
         return self.driver.execute_script("return document.documentElement.scrollHeight")
 
-
     def __scroll_inner_height(self):
         self.driver.execute_script("window.scrollBy(0, Math.abs(window.innerHeight * 0.8));")
     
@@ -182,15 +185,37 @@ class Stage1:
             pass
         return False
 
+    def __load_page(self, url, max_attempts=5, timeout=20):
+        """ moving to an exact web page and make sure it is loaded."""
+        for attempt in range(1, max_attempts+1):
+            print(f"Attempt #{attempt} to load {url}")
+            # Navigate to the URL
+            self.driver.delete_all_cookies()
+            self.driver.get(url)        
+            self.driver.execute_script("document.body.style.zoom='50%'")
+
+            # Wait for the page to load
+            try:
+                element_present = EC.presence_of_element_located((By.XPATH, "//div[@id='__PWS_ROOT__']"))
+                WebDriverWait(self.driver, timeout).until(element_present)
+                print("Page loaded successfully")
+                return True # page loaded successfully indicator.
+            except TimeoutException:
+                if attempt < max_attempts:
+                    print("Timed out waiting for page to load. Retrying...")
+                else:
+                    print("Exceeded max attempts. Giving up.")
+                    return False # page doesnot loaded successfully indicator.
 
 
     def __scroll_and_scrape(self):
         try:
+            self.search_term_url = "https://www.pinterest.com/search/boards/?q="+self.search_term.replace(" ", "%20")+"&rs=filter"
+            page_loaded = self.__load_page(self.search_term_url)
+            if not page_loaded:
+                return 
             print(f"[INFO] STARTING SCROLLING AND SCRAPPING")
-            self.driver.delete_all_cookies()
-            self.driver.execute_script("document.body.style.zoom='50%'")
-            self.driver.get("https://www.pinterest.com/search/boards/?q="+self.search_term.replace(" ", "%20")+"&rs=filter")
-
+            
             scroll_trigger_count = 0
             pins_trigger_count = 0 
             while scroll_trigger_count <= 10 and pins_trigger_count <= TRIGGER_STOP:
