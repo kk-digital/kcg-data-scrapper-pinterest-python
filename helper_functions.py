@@ -8,7 +8,9 @@ import os
 import time
 from selenium.webdriver.common.by import By
 import requests
+import logging
 
+logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG)
 
 def init_driver():
     """ Creating driver object """
@@ -122,7 +124,7 @@ def page_has_loaded(driver, sleep_time = 1):
         page_hash = get_page_hash(driver)
         time.sleep(sleep_time)
         page_hash_new = get_page_hash(driver)
-        #print('<page_has_loaded> - page not loaded')
+        #logging.info('<page_has_loaded> - page not loaded')
 
         
-    print("[INFO] page loaded.")
+    logging.info("[INFO] page loaded.")

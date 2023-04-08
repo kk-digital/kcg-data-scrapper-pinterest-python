@@ -10,9 +10,9 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import logging
 
-
-
+logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG)
 DATABASE_PATH = "database.db"
 SCROLL_IDLE_TIME = 3
 TRIGGER_STOP = 7 # If your internet connection is slow, increase this number.
@@ -47,7 +47,7 @@ class Stage2:
                 pins_count = cursor[0][0]
 
         except Exception as e :
-            print(f"[ERROR] cannot count pins in stage2 in board {self.board_url}!, because of {e}")
+            logging.info(f"[ERROR] cannot count pins in stage2 in board {self.board_url}!, because of {e}")
             time.sleep(1)
             return self.__count_pins_in_board(self.board_url)
         return pins_count
@@ -63,17 +63,17 @@ class Stage2:
                 exist = cursor[0]
 
         except Exception as e :
-            print(f"[ERROR] cannot check board existance , because of {e}")
+            logging.info(f"[ERROR] cannot check board existance , because of {e}")
             time.sleep(1)
             return self.__exist_in_db(pin_url)
         return exist
 
     def __push_to_database(self, pin_url):
         if self.__exist_in_db(pin_url):
-            #print(f"[INFO] {pin_url} with {self.board_url} exists.")
+            #logging.info(f"[INFO] {pin_url} with {self.board_url} exists.")
             return 
         else:
-            #print(f"[INFO] inserting {pin_url} with {self.board_url}.")
+            #logging.info(f"[INFO] inserting {pin_url} with {self.board_url}.")
             self.__insert_to_database(pin_url)
 
     def __insert_to_database(self, pin_url):
@@ -83,7 +83,7 @@ class Stage2:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute(cmd)
                 conn.commit()
-                print(f"[INFO] INSERTING {pin_url}")
+                logging.info(f"[INFO] INSERTING {pin_url}")
         except Exception as e:
             if(str(e).lower().find("unique") != -1):
                 pass
@@ -91,7 +91,7 @@ class Stage2:
                 time.sleep(1)
                 self.__push_to_database(pin_url)
             else:
-                print(str(e))
+                logging.info(str(e))
 
 
     def __get_board_urls(self):
@@ -102,7 +102,7 @@ class Stage2:
                 conn.commit()
                 returns.extend(url[0] for url in cursor)
         except Exception as e :
-            print(f"[ERROR] cannot get the boards urls!, because of {e}")
+            logging.info(f"[ERROR] cannot get the boards urls!, because of {e}")
             time.sleep(1)
             return self.__get_board_urls()
         return returns
@@ -140,7 +140,7 @@ class Stage2:
     def __load_page(self, url, max_attempts=5, timeout=20):
         """ moving to an exact web page and make sure it is loaded."""
         for attempt in range(1, max_attempts+1):
-            print(f"Attempt #{attempt} to load {url}")
+            logging.info(f"Attempt #{attempt} to load {url}")
             # Navigate to the URL
             self.driver.delete_all_cookies()
             self.driver.get(url)        
@@ -150,13 +150,13 @@ class Stage2:
             try:
                 element_present = EC.presence_of_element_located((By.XPATH, "//div[@id='__PWS_ROOT__']"))
                 WebDriverWait(self.driver, timeout).until(element_present)
-                print("Page loaded successfully")
+                logging.info("Page loaded successfully")
                 return True # page loaded successfully indicator.
             except TimeoutException:
                 if attempt < max_attempts:
-                    print("Timed out waiting for page to load. Retrying...")
+                    logging.info("Timed out waiting for page to load. Retrying...")
                 else:
-                    print("Exceeded max attempts. Giving up.")
+                    logging.info("Exceeded max attempts. Giving up.")
 
                     return False # page doesnot loaded successfully indicator.
 
@@ -173,7 +173,7 @@ class Stage2:
 
     def __scroll_and_scrape(self, board):
         try:
-            print(f"[INFO] STARTING SCROLLING AND SCRAPPING FOR BOARD: {board}")
+            logging.info(f"[INFO] STARTING SCROLLING AND SCRAPPING FOR BOARD: {board}")
             self.all_links = []
 
             page_loaded = self.__load_page(self.board_url)
@@ -188,7 +188,7 @@ class Stage2:
                 before_pins_count = len(self.all_links)
                 before_scroll_height = self.__get_scroll_height()
 
-                print(f"[INFO] {board} SCROLLING")
+                logging.info(f"[INFO] {board} SCROLLING")
                 self.__scroll_inner_height()
                 time.sleep(SCROLL_IDLE_TIME)
                 # Scrapping the pins.
@@ -196,26 +196,26 @@ class Stage2:
                     self.__get_link_pin()
                 except Exception as e:
                     if not self.__is_netwrok_available():
-                        print("[ERROR] NETWORK ERROR; PLEASE CHECK")
-                        print("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
+                        logging.info("[ERROR] NETWORK ERROR; PLEASE CHECK")
+                        logging.info("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
                         self.__scroll_and_scrape(board)                    
 
                     if self.__scrolling_boards():                        
                         pins_trigger_count = 0 
                         scroll_trigger_count = 0
-                        print("[INFO] SCROLLING BOARDS; NO PINS AVAILABLE TILL NOW")
+                        logging.info("[INFO] SCROLLING BOARDS; NO PINS AVAILABLE TILL NOW")
                         continue
                     
-                    print(f"[ERROR] IN GETTING PINS; {e}")
+                    logging.info(f"[ERROR] IN GETTING PINS; {e}")
                     save_html_page(self.board_url, f"{self.board_url}_stage2_error.html")
-                    print(f"[ERROR] CHECK HTML PAGE: {self.board_url}_stage2_error.html")
-                    print(f"[ERROR] IN BOARD {board} IN GETTING PINS")
-                    print(f"[INFO] ENDING {board}")
+                    logging.info(f"[ERROR] CHECK HTML PAGE: {self.board_url}_stage2_error.html")
+                    logging.info(f"[ERROR] IN BOARD {board} IN GETTING PINS")
+                    logging.info(f"[INFO] ENDING {board}")
                     return
 
-                print(f"[INFO]{board} :: NUMBER OF PINS SCRAPPED: {len(self.all_links)} PINS OUT OF {target_number_of_pins}")
-                print(f"[INFO]{board} :: SCROLLING")           
-                print(f"[INFO] NUMBER OF BOARDS SCRAPPED {self.scrapped_boards_count}")
+                logging.info(f"[INFO]{board} :: NUMBER OF PINS SCRAPPED: {len(self.all_links)} PINS OUT OF {target_number_of_pins}")
+                logging.info(f"[INFO]{board} :: SCROLLING")           
+                logging.info(f"[INFO] NUMBER OF BOARDS SCRAPPED {self.scrapped_boards_count}")
                 self.__scroll_inner_height()
                 time.sleep(SCROLL_IDLE_TIME)
                 # Scrapping the pins.
@@ -223,47 +223,47 @@ class Stage2:
                     self.__get_link_pin()
                 except Exception as e:
                     if not self.__is_netwrok_available():
-                        print("[ERROR] NETWORK ERROR; PLEASE CHECK")
-                        print("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
+                        logging.info("[ERROR] NETWORK ERROR; PLEASE CHECK")
+                        logging.info("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
                         self.__scroll_and_scrape(board)                    
 
                     if self.__scrolling_boards():
                         pins_trigger_count = 0 
                         scroll_trigger_count = 0
-                        print("[INFO] SCROLLING BOARDS; NO PINS AVAILABLE TILL NOW")
-                        print(f"[INFO] BEFORE SCROLL HEIGHT: {before_scroll_height}")
+                        logging.info("[INFO] SCROLLING BOARDS; NO PINS AVAILABLE TILL NOW")
+                        logging.info(f"[INFO] BEFORE SCROLL HEIGHT: {before_scroll_height}")
                         continue
                     
-                    print(f"[ERROR] IN GETTING PINS; {e}")
+                    logging.info(f"[ERROR] IN GETTING PINS; {e}")
                     save_html_page(self.board_url, f"{self.board_url}_stage2_error.html")
-                    print(f"[ERROR] CHECK HTML PAGE: {self.board_url}_stage2_error.html")
-                    print(f"[ERROR] IN BOARD {board} IN GETTING PINS")
-                    print(f"[INFO] ENDING {board}")
+                    logging.info(f"[ERROR] CHECK HTML PAGE: {self.board_url}_stage2_error.html")
+                    logging.info(f"[ERROR] IN BOARD {board} IN GETTING PINS")
+                    logging.info(f"[INFO] ENDING {board}")
                     return
 
-                print(f"[INFO]{board} :: NUMBER OF PINS SCRAPPED: {len(self.all_links)} PINS OUT OF {target_number_of_pins}")                
+                logging.info(f"[INFO]{board} :: NUMBER OF PINS SCRAPPED: {len(self.all_links)} PINS OUT OF {target_number_of_pins}")                
                 after_pins_count = len(self.all_links)
 
-                print(f"[INFO] {board} NUMBER OF PINS SCRAPPED: {after_pins_count} PINS OUT OF {target_number_of_pins}")            
+                logging.info(f"[INFO] {board} NUMBER OF PINS SCRAPPED: {after_pins_count} PINS OUT OF {target_number_of_pins}")            
                 after_scroll_height = self.__get_scroll_height()
 
                 # Check if the scroll height is the same
                 if before_scroll_height == after_scroll_height:
                     scroll_trigger_count += 1
-                    print(f"[INFO] {board} SCROLL STOP TRIGGER COUNT INCREASED")
+                    logging.info(f"[INFO] {board} SCROLL STOP TRIGGER COUNT INCREASED")
                 else :
                     scroll_trigger_count = 0
-                    print(f"[INFO] {board} SCROLL STOP TRIGGER IS ZERO NOW")
+                    logging.info(f"[INFO] {board} SCROLL STOP TRIGGER IS ZERO NOW")
 
                 if after_pins_count == before_pins_count:
                     pins_trigger_count += 1
-                    print(f"[INFO] {board} PINS COUNT STOP TRIGGER COUNT INCREASED")
+                    logging.info(f"[INFO] {board} PINS COUNT STOP TRIGGER COUNT INCREASED")
                 else :
                     pins_trigger_count = 0
-                    print(f"[INFO] {board} PINS COUNT STOP TRIGGER IS ZERO NOW")
+                    logging.info(f"[INFO] {board} PINS COUNT STOP TRIGGER IS ZERO NOW")
         except Exception as e:
-            print(f"[ERROR] IN SCROLL AND SCRAPE {str(e)}")
-            print("[INFO] WAITING FOR 5 MINUTES")
+            logging.info(f"[ERROR] IN SCROLL AND SCRAPE {str(e)}")
+            logging.info("[INFO] WAITING FOR 5 MINUTES")
             time.sleep(5*60)
             self.__scroll_and_scrape(board)
 
@@ -275,7 +275,7 @@ class Stage2:
                 conn.commit()
                 true_pins_count = cursor[0]
         except Exception as e :
-            print(f"[ERROR] cannot get true pins count!, because of {e}")
+            logging.info(f"[ERROR] cannot get true pins count!, because of {e}")
             time.sleep(1)
             return self.__get_true_pins_count(board)
         return true_pins_count
@@ -283,22 +283,22 @@ class Stage2:
     def run(self):
         board_list = self.__get_board_urls()
         if not board_list:
-            print("[ERROR] THIS SEARCH TERM HAS NO BOARDS IN DB")
+            logging.info("[ERROR] THIS SEARCH TERM HAS NO BOARDS IN DB")
             return 
         # Starting DB connections and driver.
         self.__start_connections()
         
         for board in board_list:
             self.board_url = f"https://www.pinterest.com{board}"
-            print(f"[INFO] IN BOARD: {board}")
+            logging.info(f"[INFO] IN BOARD: {board}")
             # Check if board already scrapped
             if 0.95*self.__get_true_pins_count(board) <= self.__count_pins_in_board():
-                print(f"[INFO] BOARD {board} ALREADY SCRAPPED")
+                logging.info(f"[INFO] BOARD {board} ALREADY SCRAPPED")
                 self.scrapped_boards_count += 1
                 continue
             
             self.__scroll_and_scrape(board)
-            print(f"[INFO] BOARD {board} ; SCRAPPED {len(self.all_links)} ; TARGET {self.__get_true_pins_count(board)}")
+            logging.info(f"[INFO] BOARD {board} ; SCRAPPED {len(self.all_links)} ; TARGET {self.__get_true_pins_count(board)}")
             self.scrapped_boards_count += 1
         self.driver.close()
             

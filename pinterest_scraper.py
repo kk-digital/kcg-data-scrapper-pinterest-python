@@ -3,7 +3,8 @@ from stage1_board_search import Stage1
 from stage2_board_url_scraping import Stage2 
 from stage3_download_images import Stage3
 from typing import List
-import os 
+import logging
+import os
 
 def pintrest_scraper_cli(
                             search_term: str = None,
@@ -22,6 +23,9 @@ def pintrest_scraper_cli(
     :returns: 
     :rtype: None
     """
+
+    logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG)
+
     #make sure that if stage1 is chosen `search_term` is a valid string
     if 1 in stages_to_execute: 
         assert isinstance(search_term, str)
@@ -36,7 +40,7 @@ def pintrest_scraper_cli(
 
         if stage_no in stages_to_execute: 
             
-            print(f"[INFO] starting stage {stage_no}")
+            logging.info(f"[INFO] starting stage {stage_no}")
             stages[stage_no].run()
             
     return 

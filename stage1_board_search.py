@@ -11,9 +11,9 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import logging
 
-
-
+logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG)
 SCROLL_IDLE_TIME = 3
 POLL_TIME = 1
 SCROLL_TIMEOUT = 10
@@ -115,9 +115,9 @@ class Stage1:
             tag_div = self.driver.find_element(By.XPATH , "//div[@role='list']")
             return self.__get_boards(tag_div.get_attribute('innerHTML'))
         except Exception as e:
-            print(f"[ERROR] IN GETTING LIST HTML ELEMENT; {e}")
+            logging.info(f"[ERROR] IN GETTING LIST HTML ELEMENT; {e}")
             save_html_page(self.search_term_url, f"{self.search_term}_stage1_error.html")
-            print(f"[ERROR] CHECK HTML PAGE: {self.search_term}_stage1_error.html")
+            logging.info(f"[ERROR] CHECK HTML PAGE: {self.search_term}_stage1_error.html")
             
     def __get_scroll_height(self):
         return self.driver.execute_script("return document.documentElement.scrollHeight")
@@ -132,17 +132,17 @@ class Stage1:
                 exist = cursor[0]
 
         except Exception as e :
-            print(f"[ERROR] cannot check board existance , because of {e}")
+            logging.info(f"[ERROR] cannot check board existance , because of {e}")
             time.sleep(1)
             return self.__check_existance(board_url)
         return exist
 
     def __push_into_db(self, board_url, images_count, sections_count):
         if self.__check_existance(board_url):
-            print(f"[INFO] {board_url} with {self.search_term} exists, updating it.")
+            logging.info(f"[INFO] {board_url} with {self.search_term} exists, updating it.")
             self.__update_data_in_db(board_url, images_count, sections_count)
         else:
-            print(f"[INFO] inserting {board_url}.")
+            logging.info(f"[INFO] inserting {board_url}.")
             self.__insert_data_into_database(board_url, images_count, sections_count)
 
     def __update_data_in_db(self,board_url, images_count, sections_count):
@@ -150,7 +150,7 @@ class Stage1:
             self.db_conn.execute("UPDATE stage1 SET pin_count = ?, sections_count=? WHERE board_url = ? and search_term=?;",(images_count,sections_count,board_url,self.search_term.replace("'", "''")))
             self.db_conn.commit()        
         except Exception as e:
-            print(f"[INFO] ERROR {e} in board {board_url}")
+            logging.info(f"[INFO] ERROR {e} in board {board_url}")
  
     def __insert_data_into_database(self, board_url, images_count, sections_count):
         try:
@@ -159,12 +159,12 @@ class Stage1:
             self.db_conn.commit()
         
         except sqlite3.IntegrityError:
-            print(f"[INFO] updating board : {board_url} in DB")
+            logging.info(f"[INFO] updating board : {board_url} in DB")
             self.db_conn.execute("UPDATE stage1 SET search_term = ?, pin_count = ?, sections_count=? WHERE board_url = ?;",(self.search_term.replace("'", "''"), images_count, sections_count,board_url))
             self.db_conn.commit()
         
         except Exception as e:
-            print(f"[INFO] ERROR {e} in board {board_url}")
+            logging.info(f"[INFO] ERROR {e} in board {board_url}")
     
     def __exit_stage(self):
         self.db_conn.close()
@@ -188,7 +188,7 @@ class Stage1:
     def __load_page(self, url, max_attempts=5, timeout=20):
         """ moving to an exact web page and make sure it is loaded."""
         for attempt in range(1, max_attempts+1):
-            print(f"Attempt #{attempt} to load {url}")
+            logging.info(f"Attempt #{attempt} to load {url}")
             # Navigate to the URL
             self.driver.delete_all_cookies()
             self.driver.get(url)        
@@ -198,13 +198,13 @@ class Stage1:
             try:
                 element_present = EC.presence_of_element_located((By.XPATH, "//div[@id='__PWS_ROOT__']"))
                 WebDriverWait(self.driver, timeout).until(element_present)
-                print("Page loaded successfully")
+                logging.info("Page loaded successfully")
                 return True # page loaded successfully indicator.
             except TimeoutException:
                 if attempt < max_attempts:
-                    print("Timed out waiting for page to load. Retrying...")
+                    logging.info("Timed out waiting for page to load. Retrying...")
                 else:
-                    print("Exceeded max attempts. Giving up.")
+                    logging.info("Exceeded max attempts. Giving up.")
                     return False # page doesnot loaded successfully indicator.
 
 
@@ -214,7 +214,7 @@ class Stage1:
             page_loaded = self.__load_page(self.search_term_url)
             if not page_loaded:
                 return 
-            print(f"[INFO] STARTING SCROLLING AND SCRAPPING")
+            logging.info(f"[INFO] STARTING SCROLLING AND SCRAPPING")
             
             scroll_trigger_count = 0
             pins_trigger_count = 0 
@@ -223,64 +223,64 @@ class Stage1:
                 before_pins_count = len(self.all_data)
                 before_scroll_height = self.__get_scroll_height()
 
-                print(f"[INFO] SCROLLING")
+                logging.info(f"[INFO] SCROLLING")
                 self.__scroll_inner_height()
                 time.sleep(SCROLL_IDLE_TIME)
                 # Scrapping the pins.
                 try:
                     self.__scrape_boards_urls()
                 except Exception as e:
-                    print(f"[ERROR] IN GETTING URLS; {e}")
+                    logging.info(f"[ERROR] IN GETTING URLS; {e}")
                     pins_trigger_count = 0 
                     scroll_trigger_count = 0
 
                     if not self.__is_netwrok_available():
-                        print("[ERROR] NETWORK ERROR; PLEASE CHECK")
-                        print("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
+                        logging.info("[ERROR] NETWORK ERROR; PLEASE CHECK")
+                        logging.info("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
                         self.__scroll_and_scrape()
                     
                     continue
 
-                print(f"[INFO] NUMBER OF URLS SCRAPPED: {len(self.all_data)}")
+                logging.info(f"[INFO] NUMBER OF URLS SCRAPPED: {len(self.all_data)}")
                 
-                print(f"[INFO] SCROLLING")           
+                logging.info(f"[INFO] SCROLLING")           
                 self.__scroll_inner_height()
                 time.sleep(SCROLL_IDLE_TIME)
                 # Scrapping the pins.
                 try:
                     self.__scrape_boards_urls()
                 except Exception as e:
-                    print(f"[ERROR] IN GETTING URLS; {e}")
+                    logging.info(f"[ERROR] IN GETTING URLS; {e}")
                     pins_trigger_count = 0 
                     scroll_trigger_count = 0
 
                     if not self.__is_netwrok_available():
-                        print("[ERROR] NETWORK ERROR; PLEASE CHECK")
-                        print("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
+                        logging.info("[ERROR] NETWORK ERROR; PLEASE CHECK")
+                        logging.info("[INFO] RESTARTING THE SCROLL AND SCRAPPING FUNCTION")
                         self.__scroll_and_scrape()     
                     continue
 
-                print(f"[INFO] NUMBER OF URLS SCRAPPED: {len(self.all_data)}")                
+                logging.info(f"[INFO] NUMBER OF URLS SCRAPPED: {len(self.all_data)}")                
                 after_pins_count = len(self.all_data)
                 after_scroll_height = self.__get_scroll_height()
 
                 # Check if the scroll height is the same
                 if before_scroll_height == after_scroll_height:
                     scroll_trigger_count += 1
-                    print("[INFO] SCROLL STOP TRIGGER COUNT INCREASED")
+                    logging.info("[INFO] SCROLL STOP TRIGGER COUNT INCREASED")
                 else :
                     scroll_trigger_count = 0
-                    print("[INFO] SCROLL STOP TRIGGER IS ZERO NOW")
+                    logging.info("[INFO] SCROLL STOP TRIGGER IS ZERO NOW")
 
                 if after_pins_count == before_pins_count:
                     pins_trigger_count += 1
-                    print("[INFO] PINS COUNT STOP TRIGGER COUNT INCREASED")
+                    logging.info("[INFO] PINS COUNT STOP TRIGGER COUNT INCREASED")
                 else :
                     pins_trigger_count = 0
-                    print("[INFO] PINS COUNT STOP TRIGGER IS ZERO NOW")
+                    logging.info("[INFO] PINS COUNT STOP TRIGGER IS ZERO NOW")
         except Exception as e:
-            print(f"[ERROR] IN SCROLL AND SCRAPE {str(e)}")
-            print("[INFO] WAITING FOR 5 MINUTES")
+            logging.info(f"[ERROR] IN SCROLL AND SCRAPE {str(e)}")
+            logging.info("[INFO] WAITING FOR 5 MINUTES")
             time.sleep(5*60)
             self.__scroll_and_scrape()
 
@@ -291,9 +291,9 @@ class Stage1:
         self.__scroll_and_scrape()
         self.driver.close()
 
-        print(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
+        logging.info(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
         for url in self.all_data:
-            print(url)
+            logging.info(url)
             self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",","")),self.all_data[url][2])
 
         self.__exit_stage()
@@ -304,11 +304,11 @@ class Stage1:
         self.__scroll_and_scrape()
         self.driver.close()
 
-        print(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
+        logging.info(f"[INFO] NUMBER OF BOARDS SCRAPPED : {len(self.all_data)}")
         for url in self.all_data:
             try:
-                print(f"[INFO] IN URL {url}")
+                logging.info(f"[INFO] IN URL {url}")
                 self.__push_into_db(str(url), int(self.all_data[url][1].strip().replace(",","")),self.all_data[url][2])
             except Exception as e:
-                print(f"[WARNING] ERROR IN {url}; {e}")
+                logging.info(f"[WARNING] ERROR IN {url}; {e}")
         self.__exit_stage()

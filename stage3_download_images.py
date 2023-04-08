@@ -11,8 +11,9 @@ from os.path import isfile, join
 from bs4 import BeautifulSoup
 import concurrent.futures
 from helper_functions import save_html_page
+import logging
 
-
+logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG)
 DATABASE_PATH = 'database.db'
 
 class Stage3: 
@@ -41,7 +42,7 @@ class Stage3:
                     indices.append(int(dataset.split("-")[1]))
                     continue
                 except Exception as e:
-                    print(f"[WARINING] {dataset} has a problem")            
+                    logging.info(f"[WARINING] {dataset} has a problem")            
                     try:
                         indices.append(max(indices)+1)
                     except ValueError: # indices list is empty 
@@ -53,7 +54,7 @@ class Stage3:
     def __download_all_images(self):
         for board in self.board_pins_dict:
             board_name = board.split('/')[-2]
-            print(f"[INFO] DOWNLOADING BOARD {board_name}")
+            logging.info(f"[INFO] DOWNLOADING BOARD {board_name}")
             board_folder = "_".join([elem for elem in board.split("/") if elem != ''])
             os.makedirs(os.path.join(self.output_folder,board_folder),exist_ok=True)               
             self.unique_files[board_folder] = [] 
@@ -63,7 +64,7 @@ class Stage3:
                     try:
                         image_url = self.scraped_pin_url[pin]
                     except KeyError:
-                        #print(f"[WARNING] PIN {pin} WAS MISSED")
+                        #logging.info(f"[WARNING] PIN {pin} WAS MISSED")
                         continue
 
                     if image_url is None:
@@ -83,8 +84,8 @@ class Stage3:
         if file_path not in self.unique_files[board_folder]:
             self.unique_files[board_folder].append(file_path)
         else:
-            print(f"[WARNING] {file_path} ALREADY EXISTED IN {board_folder}")
-            print(f"[WARNING] IMAGE URL WITH PROBLEM {image_url}")
+            logging.info(f"[WARNING] {file_path} ALREADY EXISTED IN {board_folder}")
+            logging.info(f"[WARNING] IMAGE URL WITH PROBLEM {image_url}")
             return None
 
         no_of_tries = 0 
@@ -99,11 +100,11 @@ class Stage3:
         except Exception as e:
             time.sleep(1)
             if no_of_tries == 0:
-                print(f"[WARNING] {image_url} NOT DOWNLOADED -- TRYING AGAIN, {e}")
+                logging.info(f"[WARNING] {image_url} NOT DOWNLOADED -- TRYING AGAIN, {e}")
                 self.__download_image(board_folder,image_url)
                 no_of_tries += 1 
             else:
-                print(f"[ERROR] {image_url} WAS NOT DOWNLOADED, {e}")
+                logging.info(f"[ERROR] {image_url} WAS NOT DOWNLOADED, {e}")
         return None
 
     def __get_image_url_from_pin(self, pin_url):
@@ -116,11 +117,11 @@ class Stage3:
 
         except Exception as e:
             if no_of_tries == 0 :
-                print(f"[WARNING] TRYING AGAIN -- CANNOT GET IMAGE URL FOR {pin_url}, {e}")
+                logging.info(f"[WARNING] TRYING AGAIN -- CANNOT GET IMAGE URL FOR {pin_url}, {e}")
                 time.sleep(1)
                 return self.__get_image_url_from_pin(pin_url)
             else:
-                print(f"[ERROR] CANNOT GET IMAGE URL FOR {pin_url}, {e}")
+                logging.info(f"[ERROR] CANNOT GET IMAGE URL FOR {pin_url}, {e}")
 
     def __get_pins_for_board(self,board_url):
         returns= []
@@ -131,7 +132,7 @@ class Stage3:
                 for i in cursor:
                     returns.append(i[0])
         except Exception as e :
-            print(f"[ERROR] CANNOT GET PINS FOR BOARD: {board_url}!,{e}")
+            logging.info(f"[ERROR] CANNOT GET PINS FOR BOARD: {board_url}!,{e}")
             time.sleep(1)
             return self.__get_pins_for_board(board_url)
         return returns
@@ -144,7 +145,7 @@ class Stage3:
                 conn.commit()
                 true_pins_count = cursor[0]
         except Exception as e :
-            print(f"[ERROR] cannot get true pins count!, because of {e}")
+            logging.info(f"[ERROR] cannot get true pins count!, because of {e}")
             time.sleep(1)
             return self.__get_true_pins_count(board)
         return true_pins_count
@@ -159,7 +160,7 @@ class Stage3:
                 for i in cursor:
                     returns.append(i[0])
         except Exception as e :
-            print(f"[ERROR] CANNOT GET THE BOARDS URLS!, {e}")
+            logging.info(f"[ERROR] CANNOT GET THE BOARDS URLS!, {e}")
             time.sleep(1)
             return self.__get_board_urls()
         return returns
@@ -169,26 +170,26 @@ class Stage3:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute("UPDATE image_url SET img_url=? WHERE pin_url=?",(image_url,pin_url))
                 conn.commit()
-                #print(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
+                #logging.info(f"[INFO] IMAGE URL UPDATED SUCCESSFULLY FOR PIN {pin_url}")
         except Exception as e:
             if "database is locked" in str(e).lower() :
                 time.sleep(1)
                 self.__update_pin(pin_url,image_url)
             else:
-                print(f"[WARNING] {pin_url} CANNOT BE UPDATED TO DB.")
+                logging.info(f"[WARNING] {pin_url} CANNOT BE UPDATED TO DB.")
 
     def __insert_into_db(self, pin_url, image_url):
         try:
             with sqlite3.connect(DATABASE_PATH) as conn:
                 conn.execute("INSERT INTO image_url (pin_url, img_url) values (?,?)",(pin_url,image_url))
                 conn.commit()
-                #print(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
+                #logging.info(f"[INFO] IMAGE URL INSERTED SUCCESSFULLY FOR PIN {pin_url}")
         except Exception as e:
             if "database is locked" in str(e).lower() :
                 time.sleep(1)
                 self.__insert_into_db(pin_url,image_url)
             else:
-                print(f"[WARNING] {pin_url} CANNOT BE INSERTED TO DB.")
+                logging.info(f"[WARNING] {pin_url} CANNOT BE INSERTED TO DB.")
  
     def __check_existance(self, pin_url, image_url):
         exist = 0
@@ -198,7 +199,7 @@ class Stage3:
                 conn.commit()
                 exist = cursor[0]
         except Exception as e :
-            print(f"[ERROR] CANNOT CHECK EXISTANCE OF {pin_url}::{image_url},{e}")
+            logging.info(f"[ERROR] CANNOT CHECK EXISTANCE OF {pin_url}::{image_url},{e}")
             time.sleep(1)
             return self.__check_existance(pin_url)
         return exist
@@ -229,7 +230,7 @@ class Stage3:
                     num_of_tries += 1
                     continue 
             except Exception as e:
-                print(f"[WARNING] {pin_url} CANNOT LOAD IT'S PAGE")
+                logging.info(f"[WARNING] {pin_url} CANNOT LOAD IT'S PAGE")
                 num_of_tries += 1
                 continue
         
@@ -259,10 +260,10 @@ class Stage3:
             if downloaded is not None:
                 self.report_dict[board]['download_success_images'] += 1
             else:
-                print(f"[WARNING] IMAGE URL WITH ERROR IS IN PIN: {pin_url}")
+                logging.info(f"[WARNING] IMAGE URL WITH ERROR IS IN PIN: {pin_url}")
             return True
         except Exception as e:
-            print(f"[WARNING] ERROR IN PIN HANDLER FOR PIN {pin_url}; {e}")
+            logging.info(f"[WARNING] ERROR IN PIN HANDLER FOR PIN {pin_url}; {e}")
             return False       
 
         
@@ -281,9 +282,9 @@ class Stage3:
                 time.sleep(2)
                 no_of_tries += 1
                 self.__scrape_image_url(pin_url)
-            print(f"[WARNING] {pin_url} FAILED, {e}")
+            logging.info(f"[WARNING] {pin_url} FAILED, {e}")
             save_html_page(pin_url, f"{pin_url}_stage3_error.html")
-            print(f"[ERROR] CHECK HTML PAGE: {pin_url}_stage2_error.html")
+            logging.info(f"[ERROR] CHECK HTML PAGE: {pin_url}_stage2_error.html")
             return None, None 
 
     def __count_pins_in_board(self,board_url):
@@ -294,23 +295,23 @@ class Stage3:
                 conn.commit()
                 pins_count = cursor[0][0]
         except Exception as e :
-            print(f"[ERROR] cannot count pins in stage2 in board {board_url}!, because of {e}")
+            logging.info(f"[ERROR] cannot count pins in stage2 in board {board_url}!, because of {e}")
             time.sleep(1)
             return self.__count_pins_in_board(board_url)
         return pins_count
 
     def __report(self):
-        print("-"*100)
+        logging.info("-"*100)
         for board in self.board_pins_dict:
             #board_url = f"https://www.pinterest.com{board}"
             board_folder = "_".join([elem for elem in board.split("/") if elem != ''])
-            print(f"[INFO] BOARD: {board}")
-            print(f"-------> TARGET: {self.__get_true_pins_count(board)}")
-            print(f"-------> SCRAPPED: {self.report_dict[board]['scrapped_pin_count']}")
-            print(f"-------> UNIQUE: {len(self.unique_files[board_folder])}")
-            print(f"-------> DOWNLOADED: {self.report_dict[board]['download_success_images']}")
-            print("-"*50)
-        print("-"*100)
+            logging.info(f"[INFO] BOARD: {board}")
+            logging.info(f"-------> TARGET: {self.__get_true_pins_count(board)}")
+            logging.info(f"-------> SCRAPPED: {self.report_dict[board]['scrapped_pin_count']}")
+            logging.info(f"-------> UNIQUE: {len(self.unique_files[board_folder])}")
+            logging.info(f"-------> DOWNLOADED: {self.report_dict[board]['download_success_images']}")
+            logging.info("-"*50)
+        logging.info("-"*100)
 
     def __count_unique_image_urls(self):
         try:
@@ -319,13 +320,13 @@ class Stage3:
                 conn.commit()
                 return cursor[0]
         except Exception as e :
-            print(f"[ERROR] CANNOT COUNT UNIQUE IMAGE URLS")
+            logging.info(f"[ERROR] CANNOT COUNT UNIQUE IMAGE URLS")
             time.sleep(1)
             return self.__count_unique_image_urls()
 
     def __create_zip_file(self):
         shutil.make_archive(os.path.join(self.zip_output_folder,self.folder_name), 'zip', self.output_folder)
-        print(f"[INFO] ZIP FILE CREATED SUCCESSFULLY, CHECK {self.folder_name}.zip")
+        logging.info(f"[INFO] ZIP FILE CREATED SUCCESSFULLY, CHECK {self.folder_name}.zip")
 
     def run(self):
         # list of all boards urls        
@@ -335,7 +336,7 @@ class Stage3:
             # get all the pins of a board url from stage2 table 
             self.board_pins_dict[board] = self.__get_pins_for_board(f"https://www.pinterest.com{board}")
             self.report_dict[board] = {'scrapped_pin_count':0, 'download_success_images':0}
-            print(f"[INFO] HANDLING PINS OF BOARD: {board}")
+            logging.info(f"[INFO] HANDLING PINS OF BOARD: {board}")
             board_folder = "_".join([elem for elem in board.split("/") if elem != ''])
             self.unique_files[board_folder] = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -348,10 +349,10 @@ class Stage3:
                     future.result()
 
 
-        print("[INFO] REPORTING")
+        logging.info("[INFO] REPORTING")
         self.__report()
 
-        print("[INFO] CREATING ZIP FILE")
+        logging.info("[INFO] CREATING ZIP FILE")
         self.__create_zip_file()
 
 # if __name__ == '__main__':
